@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package elpulpo.tasks.v1;
+
+option go_package = "github.com/sbogutyn/el-pulpo-ai/internal/proto;pb";
+
+service TaskService {
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ReportResult(ReportResultRequest) returns (ReportResultResponse);
+}
+
+message Task {
+  string id      = 1;
+  string name    = 2;
+  bytes  payload = 3;
+}
+
+message ClaimTaskRequest  { string worker_id = 1; }
+message ClaimTaskResponse { Task task = 1; }
+
+message HeartbeatRequest  {
+  string worker_id = 1;
+  string task_id   = 2;
+}
+message HeartbeatResponse {}
+
+message ReportResultRequest {
+  string worker_id     = 1;
+  string task_id       = 2;
+  bool   success       = 3;
+  string error_message = 4;
+}
+message ReportResultResponse {}
