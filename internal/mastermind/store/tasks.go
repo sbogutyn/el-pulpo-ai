@@ -36,6 +36,8 @@ type Task struct {
 	LastHeartbeatAt *time.Time      `json:"last_heartbeat_at,omitempty"`
 	CompletedAt     *time.Time      `json:"completed_at,omitempty"`
 	LastError       *string         `json:"last_error,omitempty"`
+	JiraURL         *string         `json:"jira_url,omitempty"`
+	GithubPRURL     *string         `json:"github_pr_url,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`
 }
@@ -46,13 +48,17 @@ type NewTaskInput struct {
 	Priority     int
 	MaxAttempts  int
 	ScheduledFor *time.Time
+	JiraURL      *string
+	GithubPRURL  *string
 }
 
 const taskColumns = `
   id, name, payload, priority, status, scheduled_for,
   attempt_count, max_attempts,
   claimed_by, claimed_at, last_heartbeat_at,
-  completed_at, last_error, created_at, updated_at
+  completed_at, last_error,
+  jira_url, github_pr_url,
+  created_at, updated_at
 `
 
 func scanTask(row pgx.Row) (Task, error) {
@@ -61,7 +67,9 @@ func scanTask(row pgx.Row) (Task, error) {
 		&t.ID, &t.Name, &t.Payload, &t.Priority, &t.Status, &t.ScheduledFor,
 		&t.AttemptCount, &t.MaxAttempts,
 		&t.ClaimedBy, &t.ClaimedAt, &t.LastHeartbeatAt,
-		&t.CompletedAt, &t.LastError, &t.CreatedAt, &t.UpdatedAt,
+		&t.CompletedAt, &t.LastError,
+		&t.JiraURL, &t.GithubPRURL,
+		&t.CreatedAt, &t.UpdatedAt,
 	)
 	return t, err
 }
@@ -74,10 +82,10 @@ func (s *Store) CreateTask(ctx context.Context, in NewTaskInput) (Task, error) {
 		in.Payload = json.RawMessage(`{}`)
 	}
 	row := s.pool.QueryRow(ctx, `
-      INSERT INTO tasks (name, payload, priority, max_attempts, scheduled_for)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO tasks (name, payload, priority, max_attempts, scheduled_for, jira_url, github_pr_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING `+taskColumns,
-		in.Name, in.Payload, in.Priority, in.MaxAttempts, in.ScheduledFor,
+		in.Name, in.Payload, in.Priority, in.MaxAttempts, in.ScheduledFor, in.JiraURL, in.GithubPRURL,
 	)
 	return scanTask(row)
 }
@@ -163,12 +171,19 @@ var (
 	ErrNotRequeueable = errors.New("task: cannot requeue while active")
 )
 
+// UpdateTaskInput carries the fields editable by UpdateTask, which only
+// succeeds while a task is still pending. JiraURL and GithubPRURL are
+// included here so the pending-only edit form can set them alongside the
+// other fields; for attaching or changing refs after a task has run
+// (running/completed/failed), use UpdateTaskLinks instead.
 type UpdateTaskInput struct {
 	Name         string
 	Priority     int
 	MaxAttempts  int
 	ScheduledFor *time.Time
 	Payload      json.RawMessage
+	JiraURL      *string
+	GithubPRURL  *string
 }
 
 func (s *Store) UpdateTask(ctx context.Context, id uuid.UUID, in UpdateTaskInput) (Task, error) {
@@ -179,10 +194,12 @@ func (s *Store) UpdateTask(ctx context.Context, id uuid.UUID, in UpdateTaskInput
           max_attempts  = $4,
           scheduled_for = $5,
           payload       = COALESCE($6, payload),
+          jira_url      = $7,
+          github_pr_url = $8,
           updated_at    = now()
       WHERE id = $1 AND status = 'pending'
       RETURNING `+taskColumns,
-		id, in.Name, in.Priority, in.MaxAttempts, in.ScheduledFor, in.Payload,
+		id, in.Name, in.Priority, in.MaxAttempts, in.ScheduledFor, in.Payload, in.JiraURL, in.GithubPRURL,
 	)
 	t, err := scanTask(row)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -191,6 +208,29 @@ func (s *Store) UpdateTask(ctx context.Context, id uuid.UUID, in UpdateTaskInput
 			return Task{}, ErrNotFound
 		}
 		return Task{}, ErrNotEditable
+	}
+	return t, err
+}
+
+// UpdateTaskLinks sets the JIRA and GitHub PR reference URLs for a task.
+// Unlike UpdateTask, this works regardless of the task's current status:
+// the refs are documentation, not execution state, and are routinely
+// attached after the task has already run.
+//
+// Nil pointers persist as SQL NULL, clearing a previously-set link.
+func (s *Store) UpdateTaskLinks(
+	ctx context.Context, id uuid.UUID, jira, pr *string,
+) (Task, error) {
+	row := s.pool.QueryRow(ctx, `
+      UPDATE tasks
+      SET jira_url      = $2,
+          github_pr_url = $3,
+          updated_at    = now()
+      WHERE id = $1
+      RETURNING `+taskColumns, id, jira, pr)
+	t, err := scanTask(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Task{}, ErrNotFound
 	}
 	return t, err
 }

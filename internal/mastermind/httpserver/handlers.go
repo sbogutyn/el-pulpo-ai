@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sbogutyn/el-pulpo-ai/internal/auth"
+	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/issuerefs"
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 )
 
@@ -20,6 +21,8 @@ type taskForm struct {
 	MaxAttempts  int
 	ScheduledFor string
 	Payload      string
+	JiraURL      string
+	GithubPRURL  string
 }
 
 type listPageData struct {
@@ -40,6 +43,7 @@ type formPageData struct {
 type detailPageData struct {
 	Title string
 	Task  store.Task
+	Error string
 }
 
 func (s *Server) registerTasksRoutes() {
@@ -154,6 +158,8 @@ func (s *Server) tasksMember(w http.ResponseWriter, r *http.Request) {
 		s.tasksDelete(w, r, id)
 	case verb == "requeue" && r.Method == http.MethodPost:
 		s.tasksRequeue(w, r, id)
+	case verb == "links" && r.Method == http.MethodPost:
+		s.tasksUpdateLinks(w, r, id)
 	default:
 		http.NotFound(w, r)
 	}
@@ -204,7 +210,9 @@ func (s *Server) tasksUpdate(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	_, err = s.store.UpdateTask(r.Context(), id, store.UpdateTaskInput{
 		Name: input.Name, Priority: input.Priority,
 		MaxAttempts: input.MaxAttempts, ScheduledFor: input.ScheduledFor,
-		Payload: input.Payload,
+		Payload:     input.Payload,
+		JiraURL:     input.JiraURL,
+		GithubPRURL: input.GithubPRURL,
 	})
 	if errors.Is(err, store.ErrNotFound) {
 		http.NotFound(w, r)
@@ -219,6 +227,57 @@ func (s *Server) tasksUpdate(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 	http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+}
+
+func (s *Server) tasksUpdateLinks(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jira := strings.TrimSpace(r.FormValue("jira_url"))
+	pr := strings.TrimSpace(r.FormValue("github_pr_url"))
+
+	var jiraPtr, prPtr *string
+	if jira != "" {
+		if err := issuerefs.ValidateJira(jira); err != nil {
+			s.renderDetailError(w, r, id, "JIRA URL must look like https://<host>/browse/PROJ-123", http.StatusBadRequest)
+			return
+		}
+		jiraPtr = &jira
+	}
+	if pr != "" {
+		if err := issuerefs.ValidatePR(pr); err != nil {
+			s.renderDetailError(w, r, id, "GitHub PR URL must look like https://<host>/<org>/<repo>/pull/123", http.StatusBadRequest)
+			return
+		}
+		prPtr = &pr
+	}
+
+	if _, err := s.store.UpdateTaskLinks(r.Context(), id, jiraPtr, prPtr); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+}
+
+func (s *Server) renderDetailError(w http.ResponseWriter, r *http.Request, id uuid.UUID, msg string, code int) {
+	task, err := s.store.GetTask(r.Context(), id)
+	if errors.Is(err, store.ErrNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(code)
+	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Error: msg}); err != nil {
+		s.log.Error("render tasks_detail", "error", err)
+	}
 }
 
 func (s *Server) tasksDelete(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
@@ -261,6 +320,8 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 		Name:         r.FormValue("name"),
 		ScheduledFor: r.FormValue("scheduled_for"),
 		Payload:      r.FormValue("payload"),
+		JiraURL:      strings.TrimSpace(r.FormValue("jira_url")),
+		GithubPRURL:  strings.TrimSpace(r.FormValue("github_pr_url")),
 	}
 	if s := r.FormValue("priority"); s != "" {
 		n, err := strconv.Atoi(s)
@@ -287,11 +348,29 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 	}
 	payloadJSON := json.RawMessage(f.Payload)
 
+	var jiraPtr, prPtr *string
+	if f.JiraURL != "" {
+		if err := issuerefs.ValidateJira(f.JiraURL); err != nil {
+			return f, store.NewTaskInput{}, errors.New("JIRA URL must look like https://<host>/browse/PROJ-123")
+		}
+		v := f.JiraURL
+		jiraPtr = &v
+	}
+	if f.GithubPRURL != "" {
+		if err := issuerefs.ValidatePR(f.GithubPRURL); err != nil {
+			return f, store.NewTaskInput{}, errors.New("GitHub PR URL must look like https://<host>/<org>/<repo>/pull/123")
+		}
+		v := f.GithubPRURL
+		prPtr = &v
+	}
+
 	input := store.NewTaskInput{
 		Name:        f.Name,
 		Priority:    f.Priority,
 		MaxAttempts: f.MaxAttempts,
 		Payload:     payloadJSON,
+		JiraURL:     jiraPtr,
+		GithubPRURL: prPtr,
 	}
 	if f.ScheduledFor != "" {
 		t, err := time.ParseInLocation("2006-01-02T15:04", f.ScheduledFor, time.Local)
@@ -312,6 +391,12 @@ func formFromTask(t store.Task) taskForm {
 	}
 	if t.ScheduledFor != nil {
 		tf.ScheduledFor = t.ScheduledFor.In(time.Local).Format("2006-01-02T15:04")
+	}
+	if t.JiraURL != nil {
+		tf.JiraURL = *t.JiraURL
+	}
+	if t.GithubPRURL != nil {
+		tf.GithubPRURL = *t.GithubPRURL
 	}
 	return tf
 }

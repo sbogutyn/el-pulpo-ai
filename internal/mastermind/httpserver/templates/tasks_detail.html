@@ -1,12 +1,42 @@
 {{ define "content" }}
 <h1>{{ .Task.Name }}</h1>
+{{ if .Error }}<p role="alert">{{ .Error }}</p>{{ end }}
 <p><strong>Status:</strong> {{ .Task.Status }}</p>
 <p><strong>Priority:</strong> {{ .Task.Priority }}</p>
 <p><strong>Attempts:</strong> {{ .Task.AttemptCount }} / {{ .Task.MaxAttempts }}</p>
 <p><strong>Claimed by:</strong> {{ if .Task.ClaimedBy }}{{ .Task.ClaimedBy }}{{ else }}—{{ end }}</p>
 <p><strong>Last heartbeat:</strong> {{ if .Task.LastHeartbeatAt }}{{ .Task.LastHeartbeatAt }}{{ else }}—{{ end }}</p>
 <p><strong>Last error:</strong> {{ if .Task.LastError }}<code>{{ .Task.LastError }}</code>{{ else }}—{{ end }}</p>
+<p>
+  <strong>JIRA:</strong>
+  {{ if .Task.JiraURL }}
+    <a href="{{ deref .Task.JiraURL }}" target="_blank" rel="noopener noreferrer">{{ jiraShort (deref .Task.JiraURL) }}</a>
+  {{ else }}—{{ end }}
+</p>
+<p>
+  <strong>GitHub PR:</strong>
+  {{ if .Task.GithubPRURL }}
+    <a href="{{ deref .Task.GithubPRURL }}" target="_blank" rel="noopener noreferrer">{{ prShort (deref .Task.GithubPRURL) }}</a>
+  {{ else }}—{{ end }}
+</p>
 <pre>{{ printf "%s" .Task.Payload }}</pre>
+
+<details>
+  <summary>Update links</summary>
+  <form method="post" action="/tasks/{{ .Task.ID }}/links">
+    <label>JIRA URL
+      <input type="url" name="jira_url"
+             placeholder="https://acme.atlassian.net/browse/PROJ-123"
+             value="{{ deref .Task.JiraURL }}">
+    </label>
+    <label>GitHub PR URL
+      <input type="url" name="github_pr_url"
+             placeholder="https://github.com/org/repo/pull/123"
+             value="{{ deref .Task.GithubPRURL }}">
+    </label>
+    <button type="submit">Save links</button>
+  </form>
+</details>
 
 <div class="grid">
   {{ if eq .Task.Status "pending" }}

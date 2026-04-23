@@ -6,6 +6,16 @@
   <label>Priority <input type="number" name="priority" value="{{ .Form.Priority }}"></label>
   <label>Max attempts <input type="number" name="max_attempts" value="{{ .Form.MaxAttempts }}" min="1"></label>
   <label>Scheduled for <input type="datetime-local" name="scheduled_for" value="{{ .Form.ScheduledFor }}"></label>
+  <label>JIRA URL
+    <input type="url" name="jira_url"
+           placeholder="https://acme.atlassian.net/browse/PROJ-123"
+           value="{{ .Form.JiraURL }}">
+  </label>
+  <label>GitHub PR URL
+    <input type="url" name="github_pr_url"
+           placeholder="https://github.com/org/repo/pull/123"
+           value="{{ .Form.GithubPRURL }}">
+  </label>
   <label>Payload (JSON) <textarea name="payload" rows="6">{{ .Form.Payload }}</textarea></label>
   <button type="submit">Save</button>
   <a href="/tasks/{{ .Task.ID }}" role="button" class="secondary">Cancel</a>

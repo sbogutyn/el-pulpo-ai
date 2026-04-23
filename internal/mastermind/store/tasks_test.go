@@ -78,3 +78,58 @@ func TestListTasks_FilterAndPaginate(t *testing.T) {
 		t.Errorf("total=%d, want 5", page.Total)
 	}
 }
+
+func TestCreateAndGetTask_WithIssueRefs(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	jira := "https://acme.atlassian.net/browse/PROJ-1"
+	pr := "https://github.com/acme/widget/pull/7"
+
+	created, err := s.CreateTask(ctx, NewTaskInput{
+		Name:        "with-refs",
+		Payload:     json.RawMessage(`{}`),
+		MaxAttempts: 3,
+		JiraURL:     &jira,
+		GithubPRURL: &pr,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if created.JiraURL == nil || *created.JiraURL != jira {
+		t.Errorf("JiraURL: got %v, want %q", created.JiraURL, jira)
+	}
+	if created.GithubPRURL == nil || *created.GithubPRURL != pr {
+		t.Errorf("GithubPRURL: got %v, want %q", created.GithubPRURL, pr)
+	}
+
+	got, err := s.GetTask(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.JiraURL == nil || *got.JiraURL != jira {
+		t.Errorf("GetTask JiraURL mismatch: %v", got.JiraURL)
+	}
+	if got.GithubPRURL == nil || *got.GithubPRURL != pr {
+		t.Errorf("GetTask GithubPRURL mismatch: %v", got.GithubPRURL)
+	}
+}
+
+func TestCreateTask_NoIssueRefs_StoresNull(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	created, err := s.CreateTask(ctx, NewTaskInput{
+		Name: "no-refs", Payload: json.RawMessage(`{}`), MaxAttempts: 3,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if created.JiraURL != nil || created.GithubPRURL != nil {
+		t.Errorf("expected nil refs, got jira=%v pr=%v", created.JiraURL, created.GithubPRURL)
+	}
+}
