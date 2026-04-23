@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -20,6 +22,10 @@ import (
 var testDSN string
 
 func TestMain(m *testing.M) {
+	os.Exit(runTests(m))
+}
+
+func runTests(m *testing.M) int {
 	ctx := context.Background()
 
 	ctr, err := postgres.Run(ctx,
@@ -31,12 +37,13 @@ func TestMain(m *testing.M) {
 		testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second)),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatalf("postgres.Run: %v", err)
 	}
+	defer func() { _ = ctr.Terminate(ctx) }()
 
 	dsn, err := ctr.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		panic(err)
+		log.Fatalf("ConnectionString: %v", err)
 	}
 	testDSN = dsn
 
@@ -45,27 +52,24 @@ func TestMain(m *testing.M) {
 	migrationsDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "migrations")
 	mg, err := migrate.New("file://"+migrationsDir, dsn)
 	if err != nil {
-		panic(err)
+		log.Fatalf("migrate.New: %v", err)
 	}
-	if err := mg.Up(); err != nil && err != migrate.ErrNoChange {
-		panic(err)
+	if err := mg.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		log.Fatalf("migrate.Up: %v", err)
 	}
 
-	code := m.Run()
-
-	_ = ctr.Terminate(ctx)
-	os.Exit(code)
+	return m.Run()
 }
 
 // newPool returns a clean pool. The caller may truncate tables between tests.
 func newPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	pool, err := pgxpool.New(context.Background(), testDSN)
+	s, err := Open(context.Background(), testDSN)
 	if err != nil {
-		t.Fatalf("pgxpool.New: %v", err)
+		t.Fatalf("Open: %v", err)
 	}
-	t.Cleanup(pool.Close)
-	return pool
+	t.Cleanup(s.Close)
+	return s.Pool()
 }
 
 func truncate(t *testing.T, pool *pgxpool.Pool) {
