@@ -4,11 +4,13 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/metrics"
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 	pb "github.com/sbogutyn/el-pulpo-ai/internal/proto"
 )
@@ -24,13 +26,18 @@ func (s *Server) ClaimTask(ctx context.Context, req *pb.ClaimTaskRequest) (*pb.C
 	if req.GetWorkerId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
 	}
+	start := time.Now()
 	t, err := s.store.ClaimTask(ctx, req.GetWorkerId())
+	metrics.ClaimDurationSeconds.Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.TasksClaimedTotal.WithLabelValues("error").Inc()
 		return nil, status.Errorf(codes.Internal, "claim: %v", err)
 	}
 	if t == nil {
+		metrics.TasksClaimedTotal.WithLabelValues("empty").Inc()
 		return nil, status.Error(codes.NotFound, "no tasks available")
 	}
+	metrics.TasksClaimedTotal.WithLabelValues("success").Inc()
 	return &pb.ClaimTaskResponse{Task: &pb.Task{
 		Id:      t.ID.String(),
 		Name:    t.Name,
@@ -70,11 +77,22 @@ func (s *Server) ReportResult(ctx context.Context, req *pb.ReportResultRequest) 
 	default:
 		return nil, status.Error(codes.InvalidArgument, "outcome is required (success or failure)")
 	}
-	if err := s.store.ReportResult(ctx, req.GetWorkerId(), id, success, errMsg); err != nil {
+	terminal, err := s.store.ReportResult(ctx, req.GetWorkerId(), id, success, errMsg)
+	if err != nil {
 		if errors.Is(err, store.ErrNotOwner) {
 			return nil, status.Error(codes.FailedPrecondition, "not the current owner of this task")
 		}
 		return nil, status.Errorf(codes.Internal, "report: %v", err)
 	}
+	switch {
+	case success:
+		metrics.TasksCompletedTotal.Inc()
+	case terminal:
+		// Worker-reported failure that exhausted attempts.
+		metrics.TasksFailedTotal.WithLabelValues("reported").Inc()
+	}
+	// A non-terminal worker failure is a retry — don't count as a terminal
+	// failure here; the reaper / next ReportResult will count it when it
+	// finally lands in the failed state.
 	return &pb.ReportResultResponse{}, nil
 }

@@ -49,7 +49,7 @@ func TestReportResult_Success(t *testing.T) {
 	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
-	if err := s.ReportResult(ctx, "w1", claimed.ID, true, ""); err != nil {
+	if _, err := s.ReportResult(ctx, "w1", claimed.ID, true, ""); err != nil {
 		t.Fatalf("ReportResult: %v", err)
 	}
 	got, _ := s.GetTask(ctx, claimed.ID)
@@ -71,7 +71,7 @@ func TestReportResult_FailureRetriesThenFails(t *testing.T) {
 	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 2})
 
 	claim1, _ := s.ClaimTask(ctx, "w")
-	if err := s.ReportResult(ctx, "w", claim1.ID, false, "bad"); err != nil {
+	if _, err := s.ReportResult(ctx, "w", claim1.ID, false, "bad"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.GetTask(ctx, claim1.ID)
@@ -93,7 +93,7 @@ func TestReportResult_FailureRetriesThenFails(t *testing.T) {
 	if err != nil || claim2 == nil {
 		t.Fatalf("second claim failed: %v %v", claim2, err)
 	}
-	if err := s.ReportResult(ctx, "w", claim2.ID, false, "bad2"); err != nil {
+	if _, err := s.ReportResult(ctx, "w", claim2.ID, false, "bad2"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = s.GetTask(ctx, claim1.ID)
@@ -117,12 +117,12 @@ func TestReapStale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reaped, err := s.ReapStale(ctx, 30*time.Second)
+	outcome, err := s.ReapStale(ctx, 30*time.Second)
 	if err != nil {
 		t.Fatalf("ReapStale: %v", err)
 	}
-	if reaped != 1 {
-		t.Errorf("reaped=%d, want 1", reaped)
+	if outcome.Requeued != 1 || outcome.Failed != 0 {
+		t.Errorf("outcome=%+v, want Requeued=1 Failed=0", outcome)
 	}
 	got, _ := s.GetTask(ctx, claimed.ID)
 	if got.Status != StatusPending {
@@ -162,7 +162,7 @@ func TestReportResult_SuccessWrongOwnerFailsPrecondition(t *testing.T) {
 	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
-	err := s.ReportResult(ctx, "w2", claimed.ID, true, "")
+	_, err := s.ReportResult(ctx, "w2", claimed.ID, true, "")
 	if err != ErrNotOwner {
 		t.Errorf("got %v, want ErrNotOwner", err)
 	}
@@ -184,7 +184,7 @@ func TestReportResult_FailureWrongOwnerFailsPrecondition(t *testing.T) {
 	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
-	err := s.ReportResult(ctx, "w2", claimed.ID, false, "bad")
+	_, err := s.ReportResult(ctx, "w2", claimed.ID, false, "bad")
 	if err != ErrNotOwner {
 		t.Errorf("got %v, want ErrNotOwner", err)
 	}

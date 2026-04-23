@@ -1413,7 +1413,7 @@ func TestReportResult_Success(t *testing.T) {
 	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
-	if err := s.ReportResult(ctx, "w1", claimed.ID, true, ""); err != nil {
+	if _, err := s.ReportResult(ctx, "w1", claimed.ID, true, ""); err != nil {
 		t.Fatalf("ReportResult: %v", err)
 	}
 	got, _ := s.GetTask(ctx, claimed.ID)
@@ -1435,7 +1435,7 @@ func TestReportResult_FailureRetriesThenFails(t *testing.T) {
 	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 2})
 
 	claim1, _ := s.ClaimTask(ctx, "w")
-	if err := s.ReportResult(ctx, "w", claim1.ID, false, "bad"); err != nil {
+	if _, err := s.ReportResult(ctx, "w", claim1.ID, false, "bad"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.GetTask(ctx, claim1.ID)
@@ -1457,7 +1457,7 @@ func TestReportResult_FailureRetriesThenFails(t *testing.T) {
 	if err != nil || claim2 == nil {
 		t.Fatalf("second claim failed: %v %v", claim2, err)
 	}
-	if err := s.ReportResult(ctx, "w", claim2.ID, false, "bad2"); err != nil {
+	if _, err := s.ReportResult(ctx, "w", claim2.ID, false, "bad2"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = s.GetTask(ctx, claim1.ID)
@@ -1481,12 +1481,12 @@ func TestReapStale(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reaped, err := s.ReapStale(ctx, 30*time.Second)
+	outcome, err := s.ReapStale(ctx, 30*time.Second)
 	if err != nil {
 		t.Fatalf("ReapStale: %v", err)
 	}
-	if reaped != 1 {
-		t.Errorf("reaped=%d, want 1", reaped)
+	if outcome.Requeued != 1 || outcome.Failed != 0 {
+		t.Errorf("outcome=%+v, want Requeued=1 Failed=0", outcome)
 	}
 	got, _ := s.GetTask(ctx, claimed.ID)
 	if got.Status != StatusPending {
@@ -1537,6 +1537,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 var ErrNotOwner = errors.New("task: caller does not own this claim")
@@ -1562,9 +1563,13 @@ func (s *Store) Heartbeat(ctx context.Context, workerID string, taskID uuid.UUID
 //
 //	success = true  -> completed
 //	success = false -> retry (reset to pending with backoff) or failed (attempts exhausted)
-func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.UUID, success bool, errMsg string) error {
+//
+// The returned terminal flag is true only when this call transitioned the task
+// to the terminal `failed` state (attempts exhausted). It is false on success,
+// on a retry (still pending), and on ErrNotOwner.
+func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.UUID, success bool, errMsg string) (terminal bool, err error) {
 	if success {
-		ct, err := s.pool.Exec(ctx, `
+		ct, execErr := s.pool.Exec(ctx, `
           UPDATE tasks
           SET status       = 'completed',
               completed_at = now(),
@@ -1572,17 +1577,19 @@ func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.U
               updated_at   = now()
           WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
         `, taskID, workerID)
-		if err != nil {
-			return err
+		if execErr != nil {
+			return false, execErr
 		}
 		if ct.RowsAffected() == 0 {
-			return ErrNotOwner
+			return false, ErrNotOwner
 		}
-		return nil
+		return false, nil
 	}
 
-	// Failure: retry with linear backoff or terminate.
-	ct, err := s.pool.Exec(ctx, `
+	// Failure: retry with linear backoff or terminate. RETURNING status so the
+	// caller can distinguish a retry (pending) from a terminal failure (failed).
+	var newStatus TaskStatus
+	scanErr := s.pool.QueryRow(ctx, `
       UPDATE tasks
       SET status            = CASE
                                 WHEN attempt_count >= max_attempts THEN 'failed'::task_status
@@ -1607,23 +1614,32 @@ func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.U
           last_error        = $3,
           updated_at        = now()
       WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
-    `, taskID, workerID, errMsg)
-	if err != nil {
-		return err
+      RETURNING status
+    `, taskID, workerID, errMsg).Scan(&newStatus)
+	if errors.Is(scanErr, pgx.ErrNoRows) {
+		return false, ErrNotOwner
 	}
-	if ct.RowsAffected() == 0 {
-		return ErrNotOwner
+	if scanErr != nil {
+		return false, scanErr
 	}
-	return nil
+	return newStatus == StatusFailed, nil
+}
+
+// ReapOutcome describes the rows touched by a single ReapStale call, split by
+// the terminal status they transitioned to.
+type ReapOutcome struct {
+	Requeued int64
+	Failed   int64
 }
 
 // ReapStale reclaims tasks whose last_heartbeat_at is older than the given
-// visibility timeout. Returns the number of rows affected.
-func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (int64, error) {
+// visibility timeout. Rows whose attempt count is exhausted transition to
+// `failed`; the rest are requeued as `pending` with linear backoff.
+func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (ReapOutcome, error) {
 	// Use microseconds so sub-second visibilities are honoured (integer
 	// seconds would truncate e.g. 500ms to 0 and reap everything).
 	usecs := visibility.Microseconds()
-	ct, err := s.pool.Exec(ctx, `
+	rows, err := s.pool.Query(ctx, `
       UPDATE tasks
       SET status            = CASE
                                 WHEN attempt_count >= max_attempts THEN 'failed'::task_status
@@ -1649,11 +1665,29 @@ func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (int64,
           updated_at        = now()
       WHERE status IN ('claimed','running')
         AND last_heartbeat_at < now() - make_interval(secs => $1::double precision / 1000000)
+      RETURNING status
     `, usecs)
 	if err != nil {
-		return 0, err
+		return ReapOutcome{}, err
 	}
-	return ct.RowsAffected(), nil
+	defer rows.Close()
+
+	var out ReapOutcome
+	for rows.Next() {
+		var s TaskStatus
+		if err := rows.Scan(&s); err != nil {
+			return ReapOutcome{}, err
+		}
+		if s == StatusFailed {
+			out.Failed++
+		} else {
+			out.Requeued++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return ReapOutcome{}, err
+	}
+	return out, nil
 }
 
 // CountPending returns the number of pending tasks (used for the metrics gauge).
@@ -2254,11 +2288,13 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/metrics"
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 	pb "github.com/sbogutyn/el-pulpo-ai/internal/proto"
 )
@@ -2274,13 +2310,18 @@ func (s *Server) ClaimTask(ctx context.Context, req *pb.ClaimTaskRequest) (*pb.C
 	if req.GetWorkerId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
 	}
+	start := time.Now()
 	t, err := s.store.ClaimTask(ctx, req.GetWorkerId())
+	metrics.ClaimDurationSeconds.Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.TasksClaimedTotal.WithLabelValues("error").Inc()
 		return nil, status.Errorf(codes.Internal, "claim: %v", err)
 	}
 	if t == nil {
+		metrics.TasksClaimedTotal.WithLabelValues("empty").Inc()
 		return nil, status.Error(codes.NotFound, "no tasks available")
 	}
+	metrics.TasksClaimedTotal.WithLabelValues("success").Inc()
 	return &pb.ClaimTaskResponse{Task: &pb.Task{
 		Id:      t.ID.String(),
 		Name:    t.Name,
@@ -2320,12 +2361,23 @@ func (s *Server) ReportResult(ctx context.Context, req *pb.ReportResultRequest) 
 	default:
 		return nil, status.Error(codes.InvalidArgument, "outcome is required (success or failure)")
 	}
-	if err := s.store.ReportResult(ctx, req.GetWorkerId(), id, success, errMsg); err != nil {
+	terminal, err := s.store.ReportResult(ctx, req.GetWorkerId(), id, success, errMsg)
+	if err != nil {
 		if errors.Is(err, store.ErrNotOwner) {
 			return nil, status.Error(codes.FailedPrecondition, "not the current owner of this task")
 		}
 		return nil, status.Errorf(codes.Internal, "report: %v", err)
 	}
+	switch {
+	case success:
+		metrics.TasksCompletedTotal.Inc()
+	case terminal:
+		// Worker-reported failure that exhausted attempts.
+		metrics.TasksFailedTotal.WithLabelValues("reported").Inc()
+	}
+	// A non-terminal worker failure is a retry — don't count as a terminal
+	// failure here; the reaper / next ReportResult will count it when it
+	// finally lands in the failed state.
 	return &pb.ReportResultResponse{}, nil
 }
 ```
@@ -2424,6 +2476,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/metrics"
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 )
 
@@ -2448,13 +2501,17 @@ func (r *Reaper) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			n, err := r.store.ReapStale(ctx, r.visibility)
+			outcome, err := r.store.ReapStale(ctx, r.visibility)
 			if err != nil {
 				r.log.Warn("reaper: reap failed", "error", err)
 				continue
 			}
-			if n > 0 {
-				r.log.Info("reaper: reclaimed stale tasks", "count", n)
+			if total := outcome.Requeued + outcome.Failed; total > 0 {
+				metrics.TasksReapedTotal.Add(float64(total))
+				if outcome.Failed > 0 {
+					metrics.TasksFailedTotal.WithLabelValues("reaped").Add(float64(outcome.Failed))
+				}
+				r.log.Info("reaper: reclaimed stale tasks", "requeued", outcome.Requeued, "failed", outcome.Failed)
 			}
 		}
 	}

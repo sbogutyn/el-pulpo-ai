@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 var ErrNotOwner = errors.New("task: caller does not own this claim")
@@ -31,9 +32,13 @@ func (s *Store) Heartbeat(ctx context.Context, workerID string, taskID uuid.UUID
 //
 //	success = true  -> completed
 //	success = false -> retry (reset to pending with backoff) or failed (attempts exhausted)
-func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.UUID, success bool, errMsg string) error {
+//
+// The returned terminal flag is true only when this call transitioned the task
+// to the terminal `failed` state (attempts exhausted). It is false on success,
+// on a retry (still pending), and on ErrNotOwner.
+func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.UUID, success bool, errMsg string) (terminal bool, err error) {
 	if success {
-		ct, err := s.pool.Exec(ctx, `
+		ct, execErr := s.pool.Exec(ctx, `
           UPDATE tasks
           SET status       = 'completed',
               completed_at = now(),
@@ -41,17 +46,19 @@ func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.U
               updated_at   = now()
           WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
         `, taskID, workerID)
-		if err != nil {
-			return err
+		if execErr != nil {
+			return false, execErr
 		}
 		if ct.RowsAffected() == 0 {
-			return ErrNotOwner
+			return false, ErrNotOwner
 		}
-		return nil
+		return false, nil
 	}
 
-	// Failure: retry with linear backoff or terminate.
-	ct, err := s.pool.Exec(ctx, `
+	// Failure: retry with linear backoff or terminate. RETURNING status so the
+	// caller can distinguish a retry (pending) from a terminal failure (failed).
+	var newStatus TaskStatus
+	scanErr := s.pool.QueryRow(ctx, `
       UPDATE tasks
       SET status            = CASE
                                 WHEN attempt_count >= max_attempts THEN 'failed'::task_status
@@ -76,23 +83,32 @@ func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.U
           last_error        = $3,
           updated_at        = now()
       WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
-    `, taskID, workerID, errMsg)
-	if err != nil {
-		return err
+      RETURNING status
+    `, taskID, workerID, errMsg).Scan(&newStatus)
+	if errors.Is(scanErr, pgx.ErrNoRows) {
+		return false, ErrNotOwner
 	}
-	if ct.RowsAffected() == 0 {
-		return ErrNotOwner
+	if scanErr != nil {
+		return false, scanErr
 	}
-	return nil
+	return newStatus == StatusFailed, nil
+}
+
+// ReapOutcome describes the rows touched by a single ReapStale call, split by
+// the terminal status they transitioned to.
+type ReapOutcome struct {
+	Requeued int64
+	Failed   int64
 }
 
 // ReapStale reclaims tasks whose last_heartbeat_at is older than the given
-// visibility timeout. Returns the number of rows affected.
-func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (int64, error) {
+// visibility timeout. Rows whose attempt count is exhausted transition to
+// `failed`; the rest are requeued as `pending` with linear backoff.
+func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (ReapOutcome, error) {
 	// Use microseconds so sub-second visibilities are honoured (integer
 	// seconds would truncate e.g. 500ms to 0 and reap everything).
 	usecs := visibility.Microseconds()
-	ct, err := s.pool.Exec(ctx, `
+	rows, err := s.pool.Query(ctx, `
       UPDATE tasks
       SET status            = CASE
                                 WHEN attempt_count >= max_attempts THEN 'failed'::task_status
@@ -118,11 +134,29 @@ func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (int64,
           updated_at        = now()
       WHERE status IN ('claimed','running')
         AND last_heartbeat_at < now() - make_interval(secs => $1::double precision / 1000000)
+      RETURNING status
     `, usecs)
 	if err != nil {
-		return 0, err
+		return ReapOutcome{}, err
 	}
-	return ct.RowsAffected(), nil
+	defer rows.Close()
+
+	var out ReapOutcome
+	for rows.Next() {
+		var s TaskStatus
+		if err := rows.Scan(&s); err != nil {
+			return ReapOutcome{}, err
+		}
+		if s == StatusFailed {
+			out.Failed++
+		} else {
+			out.Requeued++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return ReapOutcome{}, err
+	}
+	return out, nil
 }
 
 // CountPending returns the number of pending tasks (used for the metrics gauge).

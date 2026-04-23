@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/metrics"
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 )
 
@@ -30,13 +31,17 @@ func (r *Reaper) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			n, err := r.store.ReapStale(ctx, r.visibility)
+			outcome, err := r.store.ReapStale(ctx, r.visibility)
 			if err != nil {
 				r.log.Warn("reaper: reap failed", "error", err)
 				continue
 			}
-			if n > 0 {
-				r.log.Info("reaper: reclaimed stale tasks", "count", n)
+			if total := outcome.Requeued + outcome.Failed; total > 0 {
+				metrics.TasksReapedTotal.Add(float64(total))
+				if outcome.Failed > 0 {
+					metrics.TasksFailedTotal.WithLabelValues("reaped").Add(float64(outcome.Failed))
+				}
+				r.log.Info("reaper: reclaimed stale tasks", "requeued", outcome.Requeued, "failed", outcome.Failed)
 			}
 		}
 	}
