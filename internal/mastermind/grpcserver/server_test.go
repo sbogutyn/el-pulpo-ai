@@ -80,21 +80,26 @@ func TestClaimThenReport_Success(t *testing.T) {
 func TestHeartbeat_WrongOwner_FailsPrecondition(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
-	_, _ = s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
-	resp, _ := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	resp, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	if err != nil {
+		t.Fatalf("ClaimTask: %v", err)
+	}
 
-	_, err := client.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: "other", TaskId: resp.Task.Id})
+	_, err = client.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: "other", TaskId: resp.Task.Id})
 	if status.Code(err) != codes.FailedPrecondition {
 		t.Errorf("code=%v, want FailedPrecondition", status.Code(err))
 	}
 }
 
-func TestServer_DeadlineHonoured(t *testing.T) {
+func TestClaimTask_WithDeadline_StillReturnsNotFound(t *testing.T) {
 	client, _ := startBufServer(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	// Empty queue -> NotFound; ensures we can exercise the client with a deadline.
-	if _, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w"}); err == nil {
-		t.Error("expected NotFound error")
+	_, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("code=%v, want NotFound", status.Code(err))
 	}
 }
