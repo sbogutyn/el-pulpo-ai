@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/sbogutyn/el-pulpo-ai/internal/auth"
+	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/issuerefs"
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 )
 
@@ -37,6 +38,11 @@ type Server struct {
 }
 
 func New(s *store.Store, cfg Config, log *slog.Logger) (*Server, error) {
+	funcs := template.FuncMap{
+		"jiraShort": issuerefs.JiraShort,
+		"prShort":   issuerefs.PRShort,
+	}
+
 	pages := map[string]*template.Template{}
 	pageFiles := map[string][]string{
 		"tasks_list":   {"templates/base.html", "templates/tasks_list.html", "templates/tasks_fragment.html"},
@@ -45,13 +51,13 @@ func New(s *store.Store, cfg Config, log *slog.Logger) (*Server, error) {
 		"tasks_detail": {"templates/base.html", "templates/tasks_detail.html"},
 	}
 	for name, files := range pageFiles {
-		t, err := template.ParseFS(templatesFS, files...)
+		t, err := template.New("").Funcs(funcs).ParseFS(templatesFS, files...)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", name, err)
 		}
 		pages[name] = t
 	}
-	fragTree, err := template.ParseFS(templatesFS, "templates/tasks_fragment.html")
+	fragTree, err := template.New("").Funcs(funcs).ParseFS(templatesFS, "templates/tasks_fragment.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse tasks_fragment: %w", err)
 	}
