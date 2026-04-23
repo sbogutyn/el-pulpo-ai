@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestUpdateTask_OnlyWhilePending(t *testing.T) {
@@ -95,5 +97,71 @@ func TestRequeueTask(t *testing.T) {
 	}
 	if _, err := s.RequeueTask(ctx, created.ID); err != ErrNotRequeueable {
 		t.Errorf("want ErrNotRequeueable, got %v", err)
+	}
+}
+
+func TestUpdateTaskLinks_WorksInAnyStatus(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3})
+
+	// Force a status where UpdateTask would fail.
+	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='failed' WHERE id=$1`, created.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	jira := "https://acme.atlassian.net/browse/PROJ-9"
+	pr := "https://github.com/acme/widget/pull/42"
+	upd, err := s.UpdateTaskLinks(ctx, created.ID, &jira, &pr)
+	if err != nil {
+		t.Fatalf("UpdateTaskLinks: %v", err)
+	}
+	if upd.JiraURL == nil || *upd.JiraURL != jira {
+		t.Errorf("JiraURL mismatch: %v", upd.JiraURL)
+	}
+	if upd.GithubPRURL == nil || *upd.GithubPRURL != pr {
+		t.Errorf("GithubPRURL mismatch: %v", upd.GithubPRURL)
+	}
+	if upd.Status != "failed" {
+		t.Errorf("status changed: %q", upd.Status)
+	}
+}
+
+func TestUpdateTaskLinks_NilClears(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	jira := "https://acme.atlassian.net/browse/PROJ-9"
+	pr := "https://github.com/acme/widget/pull/42"
+	created, _ := s.CreateTask(ctx, NewTaskInput{
+		Name: "x", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+	})
+
+	upd, err := s.UpdateTaskLinks(ctx, created.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("UpdateTaskLinks: %v", err)
+	}
+	if upd.JiraURL != nil {
+		t.Errorf("JiraURL not cleared: %v", *upd.JiraURL)
+	}
+	if upd.GithubPRURL != nil {
+		t.Errorf("GithubPRURL not cleared: %v", *upd.GithubPRURL)
+	}
+}
+
+func TestUpdateTaskLinks_NotFound(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	_, err := s.UpdateTaskLinks(ctx, uuid.New(), nil, nil)
+	if err != ErrNotFound {
+		t.Errorf("got %v, want ErrNotFound", err)
 	}
 }

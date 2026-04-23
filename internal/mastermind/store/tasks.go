@@ -207,6 +207,29 @@ func (s *Store) UpdateTask(ctx context.Context, id uuid.UUID, in UpdateTaskInput
 	return t, err
 }
 
+// UpdateTaskLinks sets the JIRA and GitHub PR reference URLs for a task.
+// Unlike UpdateTask, this works regardless of the task's current status:
+// the refs are documentation, not execution state, and are routinely
+// attached after the task has already run.
+//
+// Nil pointers persist as SQL NULL, clearing a previously-set link.
+func (s *Store) UpdateTaskLinks(
+	ctx context.Context, id uuid.UUID, jira, pr *string,
+) (Task, error) {
+	row := s.pool.QueryRow(ctx, `
+      UPDATE tasks
+      SET jira_url      = $2,
+          github_pr_url = $3,
+          updated_at    = now()
+      WHERE id = $1
+      RETURNING `+taskColumns, id, jira, pr)
+	t, err := scanTask(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	return t, err
+}
+
 func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID) error {
 	ct, err := s.pool.Exec(ctx, `
       DELETE FROM tasks
