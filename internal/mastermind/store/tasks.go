@@ -114,9 +114,9 @@ func (s *Store) ListTasks(ctx context.Context, f ListTasksFilter) (TasksPage, er
 		where = "WHERE status = $1"
 		args = append(args, *f.Status)
 	}
-	args = append(args, f.Limit, f.Offset)
-
-	limitIdx := len(args) - 1
+	args = append(args, f.Limit)
+	limitIdx := len(args)
+	args = append(args, f.Offset)
 	offsetIdx := len(args)
 
 	q := `SELECT ` + taskColumns + ` FROM tasks ` + where +
@@ -151,6 +151,9 @@ func (s *Store) ListTasks(ctx context.Context, f ListTasksFilter) (TasksPage, er
 
 func itoa(i int) string {
 	// Small helper to avoid importing strconv for a single-digit placeholder index.
+	if i < 0 || i > 9 {
+		panic("store.itoa: index out of single-digit range; use strconv.Itoa")
+	}
 	return string(rune('0' + i))
 }
 
