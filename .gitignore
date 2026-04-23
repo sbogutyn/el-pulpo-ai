@@ -1,0 +1,18 @@
+# Binaries
+/bin/
+/mastermind
+/worker
+
+# Test output
+coverage.out
+
+# Local env / tooling
+.env
+.DS_Store
+
+# Generated protobuf (regenerate with `make proto`)
+# Keep checked in so downstream consumers don't need protoc.
+# internal/proto/*.pb.go
+
+# Docker / local state
+.tmp/
