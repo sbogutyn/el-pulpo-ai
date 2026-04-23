@@ -68,6 +68,70 @@ func TestCreateTask_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestCreateTask_WithIssueRefs(t *testing.T) {
+	t.Skip("enabled in Task 12 once list template renders short forms")
+	srv := newServer(t)
+
+	form := url.Values{
+		"name":          {"with-refs"},
+		"priority":      {"0"},
+		"max_attempts":  {"3"},
+		"payload":       {"{}"},
+		"jira_url":      {"https://acme.atlassian.net/browse/PROJ-1"},
+		"github_pr_url": {"https://github.com/acme/widget/pull/7"},
+	}.Encode()
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks", form))
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("create code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	rr = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodGet, "/tasks", ""))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("list code=%d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "PROJ-1") {
+		t.Errorf("list missing JIRA short form: %s", body)
+	}
+	if !strings.Contains(body, "acme/widget#7") {
+		t.Errorf("list missing PR short form: %s", body)
+	}
+}
+
+func TestCreateTask_InvalidJiraURL(t *testing.T) {
+	srv := newServer(t)
+	form := url.Values{
+		"name":     {"x"},
+		"payload":  {"{}"},
+		"jira_url": {"not-a-jira-url"},
+	}.Encode()
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks", form))
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("code=%d want 400", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "JIRA") {
+		t.Errorf("response missing JIRA error hint: %s", rr.Body.String())
+	}
+}
+
+func TestCreateTask_InvalidPRURL(t *testing.T) {
+	srv := newServer(t)
+	form := url.Values{
+		"name":          {"x"},
+		"payload":       {"{}"},
+		"github_pr_url": {"https://github.com/x/y/issues/1"},
+	}.Encode()
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks", form))
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("code=%d want 400", rr.Code)
+	}
+}
+
 func TestDeleteTask(t *testing.T) {
 	srv := newServer(t)
 	s, err := store.Open(context.Background(), testDSN)
