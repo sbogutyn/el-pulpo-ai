@@ -12,8 +12,10 @@ import (
 
 var (
 	ErrInvalidJira = errors.New("invalid JIRA URL")
+	ErrInvalidPR   = errors.New("invalid GitHub PR URL")
 
 	jiraRE = regexp.MustCompile(`^https?://[^/]+/browse/([A-Z][A-Z0-9_]+-\d+)(?:[?#].*)?$`)
+	prRE   = regexp.MustCompile(`^https?://[^/]+/([^/]+)/([^/]+)/pull/(\d+)(?:[?#].*)?$`)
 )
 
 func ValidateJira(s string) error {
@@ -32,4 +34,22 @@ func JiraShort(url string) string {
 		return url
 	}
 	return m[1]
+}
+
+func ValidatePR(s string) error {
+	if !prRE.MatchString(s) {
+		return ErrInvalidPR
+	}
+	return nil
+}
+
+func PRShort(url string) string {
+	if url == "" {
+		return ""
+	}
+	m := prRE.FindStringSubmatch(url)
+	if len(m) < 4 {
+		return url
+	}
+	return m[1] + "/" + m[2] + "#" + m[3]
 }
