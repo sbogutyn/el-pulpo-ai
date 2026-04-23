@@ -4122,7 +4122,7 @@ docker-compose.yml
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7
-FROM golang:1.22-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -4142,7 +4142,7 @@ ENTRYPOINT ["/app/mastermind"]
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7
-FROM golang:1.22-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
