@@ -4,7 +4,7 @@
 // 	protoc        v7.34.1
 // source: internal/proto/tasks.proto
 
-package pb
+package tasksv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -21,11 +21,18 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Task is the unit of work handed from mastermind to a worker.
 type Task struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Identifier assigned by mastermind. Matches the `id` column of the
+	// mastermind tasks table (UUID v4 serialized canonical 8-4-4-4-12).
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Logical task type. Workers dispatch on this string to decide which
+	// handler to run.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Opaque, caller-defined JSON payload. Mastermind stores this verbatim and
+	// does not interpret it.
+	Payload       []byte `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -81,9 +88,13 @@ func (x *Task) GetPayload() []byte {
 	return nil
 }
 
+// ClaimTaskRequest asks mastermind for the next available task.
 type ClaimTaskRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Stable identifier for the calling worker, typically "<hostname>-<pid>" or
+	// a UUID chosen at process start. Mastermind records this on the claim for
+	// debugging and poison-pill attribution.
+	WorkerId      string `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -125,6 +136,9 @@ func (x *ClaimTaskRequest) GetWorkerId() string {
 	return ""
 }
 
+// ClaimTaskResponse carries a claimed task. On empty-queue the server returns
+// NOT_FOUND instead of an empty response, so `task` is guaranteed non-nil on
+// success.
 type ClaimTaskResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Task          *Task                  `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
@@ -169,6 +183,7 @@ func (x *ClaimTaskResponse) GetTask() *Task {
 	return nil
 }
 
+// HeartbeatRequest refreshes the caller's lease on an owned task.
 type HeartbeatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
@@ -257,12 +272,18 @@ func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
 	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{4}
 }
 
+// ReportResultRequest finalizes a task with either success or failure.
+// `outcome` is a oneof so that "neither set" and "both set" are unrepresentable
+// on the wire.
 type ReportResultRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
-	TaskId        string                 `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	Success       bool                   `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	TaskId   string                 `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	// Types that are valid to be assigned to Outcome:
+	//
+	//	*ReportResultRequest_Success_
+	//	*ReportResultRequest_Failure_
+	Outcome       isReportResultRequest_Outcome `protobuf_oneof:"outcome"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -311,19 +332,46 @@ func (x *ReportResultRequest) GetTaskId() string {
 	return ""
 }
 
-func (x *ReportResultRequest) GetSuccess() bool {
+func (x *ReportResultRequest) GetOutcome() isReportResultRequest_Outcome {
 	if x != nil {
-		return x.Success
+		return x.Outcome
 	}
-	return false
+	return nil
 }
 
-func (x *ReportResultRequest) GetErrorMessage() string {
+func (x *ReportResultRequest) GetSuccess() *ReportResultRequest_Success {
 	if x != nil {
-		return x.ErrorMessage
+		if x, ok := x.Outcome.(*ReportResultRequest_Success_); ok {
+			return x.Success
+		}
 	}
-	return ""
+	return nil
 }
+
+func (x *ReportResultRequest) GetFailure() *ReportResultRequest_Failure {
+	if x != nil {
+		if x, ok := x.Outcome.(*ReportResultRequest_Failure_); ok {
+			return x.Failure
+		}
+	}
+	return nil
+}
+
+type isReportResultRequest_Outcome interface {
+	isReportResultRequest_Outcome()
+}
+
+type ReportResultRequest_Success_ struct {
+	Success *ReportResultRequest_Success `protobuf:"bytes,3,opt,name=success,proto3,oneof"`
+}
+
+type ReportResultRequest_Failure_ struct {
+	Failure *ReportResultRequest_Failure `protobuf:"bytes,4,opt,name=failure,proto3,oneof"`
+}
+
+func (*ReportResultRequest_Success_) isReportResultRequest_Outcome() {}
+
+func (*ReportResultRequest_Failure_) isReportResultRequest_Outcome() {}
 
 type ReportResultResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -361,6 +409,92 @@ func (*ReportResultResponse) Descriptor() ([]byte, []int) {
 	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{6}
 }
 
+// Success signals the task completed. Empty today, but kept as a message
+// (not a bare flag) so fields like output summary or timing can be added
+// without a breaking change.
+type ReportResultRequest_Success struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportResultRequest_Success) Reset() {
+	*x = ReportResultRequest_Success{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportResultRequest_Success) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportResultRequest_Success) ProtoMessage() {}
+
+func (x *ReportResultRequest_Success) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportResultRequest_Success.ProtoReflect.Descriptor instead.
+func (*ReportResultRequest_Success) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{5, 0}
+}
+
+// Failure signals the task did not complete. `message` is surfaced as
+// `last_error` in the mastermind tasks table and included in retry
+// bookkeeping.
+type ReportResultRequest_Failure struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportResultRequest_Failure) Reset() {
+	*x = ReportResultRequest_Failure{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportResultRequest_Failure) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportResultRequest_Failure) ProtoMessage() {}
+
+func (x *ReportResultRequest_Failure) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportResultRequest_Failure.ProtoReflect.Descriptor instead.
+func (*ReportResultRequest_Failure) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{5, 1}
+}
+
+func (x *ReportResultRequest_Failure) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_internal_proto_tasks_proto protoreflect.FileDescriptor
 
 const file_internal_proto_tasks_proto_rawDesc = "" +
@@ -377,17 +511,21 @@ const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\x10HeartbeatRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\tR\x06taskId\"\x13\n" +
-	"\x11HeartbeatResponse\"\x8a\x01\n" +
+	"\x11HeartbeatResponse\"\x9c\x02\n" +
 	"\x13ReportResultRequest\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x17\n" +
-	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x18\n" +
-	"\asuccess\x18\x03 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"\x16\n" +
+	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12I\n" +
+	"\asuccess\x18\x03 \x01(\v2-.elpulpo.tasks.v1.ReportResultRequest.SuccessH\x00R\asuccess\x12I\n" +
+	"\afailure\x18\x04 \x01(\v2-.elpulpo.tasks.v1.ReportResultRequest.FailureH\x00R\afailure\x1a\t\n" +
+	"\aSuccess\x1a#\n" +
+	"\aFailure\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessageB\t\n" +
+	"\aoutcome\"\x16\n" +
 	"\x14ReportResultResponse2\x98\x02\n" +
 	"\vTaskService\x12T\n" +
 	"\tClaimTask\x12\".elpulpo.tasks.v1.ClaimTaskRequest\x1a#.elpulpo.tasks.v1.ClaimTaskResponse\x12T\n" +
 	"\tHeartbeat\x12\".elpulpo.tasks.v1.HeartbeatRequest\x1a#.elpulpo.tasks.v1.HeartbeatResponse\x12]\n" +
-	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponseB3Z1github.com/sbogutyn/el-pulpo-ai/internal/proto;pbb\x06proto3"
+	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponseB8Z6github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1b\x06proto3"
 
 var (
 	file_internal_proto_tasks_proto_rawDescOnce sync.Once
@@ -401,29 +539,33 @@ func file_internal_proto_tasks_proto_rawDescGZIP() []byte {
 	return file_internal_proto_tasks_proto_rawDescData
 }
 
-var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_internal_proto_tasks_proto_goTypes = []any{
-	(*Task)(nil),                 // 0: elpulpo.tasks.v1.Task
-	(*ClaimTaskRequest)(nil),     // 1: elpulpo.tasks.v1.ClaimTaskRequest
-	(*ClaimTaskResponse)(nil),    // 2: elpulpo.tasks.v1.ClaimTaskResponse
-	(*HeartbeatRequest)(nil),     // 3: elpulpo.tasks.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),    // 4: elpulpo.tasks.v1.HeartbeatResponse
-	(*ReportResultRequest)(nil),  // 5: elpulpo.tasks.v1.ReportResultRequest
-	(*ReportResultResponse)(nil), // 6: elpulpo.tasks.v1.ReportResultResponse
+	(*Task)(nil),                        // 0: elpulpo.tasks.v1.Task
+	(*ClaimTaskRequest)(nil),            // 1: elpulpo.tasks.v1.ClaimTaskRequest
+	(*ClaimTaskResponse)(nil),           // 2: elpulpo.tasks.v1.ClaimTaskResponse
+	(*HeartbeatRequest)(nil),            // 3: elpulpo.tasks.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),           // 4: elpulpo.tasks.v1.HeartbeatResponse
+	(*ReportResultRequest)(nil),         // 5: elpulpo.tasks.v1.ReportResultRequest
+	(*ReportResultResponse)(nil),        // 6: elpulpo.tasks.v1.ReportResultResponse
+	(*ReportResultRequest_Success)(nil), // 7: elpulpo.tasks.v1.ReportResultRequest.Success
+	(*ReportResultRequest_Failure)(nil), // 8: elpulpo.tasks.v1.ReportResultRequest.Failure
 }
 var file_internal_proto_tasks_proto_depIdxs = []int32{
 	0, // 0: elpulpo.tasks.v1.ClaimTaskResponse.task:type_name -> elpulpo.tasks.v1.Task
-	1, // 1: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
-	3, // 2: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
-	5, // 3: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
-	2, // 4: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
-	4, // 5: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
-	6, // 6: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
-	4, // [4:7] is the sub-list for method output_type
-	1, // [1:4] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	7, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
+	8, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
+	1, // 3: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
+	3, // 4: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
+	5, // 5: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
+	2, // 6: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
+	4, // 7: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
+	6, // 8: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_internal_proto_tasks_proto_init() }
@@ -431,13 +573,17 @@ func file_internal_proto_tasks_proto_init() {
 	if File_internal_proto_tasks_proto != nil {
 		return
 	}
+	file_internal_proto_tasks_proto_msgTypes[5].OneofWrappers = []any{
+		(*ReportResultRequest_Success_)(nil),
+		(*ReportResultRequest_Failure_)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_tasks_proto_rawDesc), len(file_internal_proto_tasks_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

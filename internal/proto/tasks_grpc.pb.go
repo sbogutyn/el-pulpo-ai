@@ -4,7 +4,7 @@
 // - protoc             v7.34.1
 // source: internal/proto/tasks.proto
 
-package pb
+package tasksv1
 
 import (
 	context "context"
@@ -27,9 +27,25 @@ const (
 // TaskServiceClient is the client API for TaskService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// TaskService is the wire contract between the mastermind server and worker
+// clients. When removing a field in a future revision, always add a `reserved`
+// statement to prevent field-number reuse.
 type TaskServiceClient interface {
+	// ClaimTask atomically assigns the next eligible task to the calling worker
+	// and marks it as claimed. Returns gRPC NOT_FOUND when the queue is empty;
+	// clients should treat NOT_FOUND as a benign "try again later" signal, not a
+	// real failure to log.
 	ClaimTask(ctx context.Context, in *ClaimTaskRequest, opts ...grpc.CallOption) (*ClaimTaskResponse, error)
+	// Heartbeat renews the caller's lease on a previously claimed task. The
+	// first heartbeat transitions the task from `claimed` to `running`;
+	// subsequent heartbeats refresh its last-seen timestamp. Returns
+	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
+	// ReportResult finalizes a task the caller owns. A success marks the task
+	// `completed`; a failure either retries with linear backoff or transitions
+	// the task to `failed` once `max_attempts` is exhausted. Returns
+	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	ReportResult(ctx context.Context, in *ReportResultRequest, opts ...grpc.CallOption) (*ReportResultResponse, error)
 }
 
@@ -74,9 +90,25 @@ func (c *taskServiceClient) ReportResult(ctx context.Context, in *ReportResultRe
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
+//
+// TaskService is the wire contract between the mastermind server and worker
+// clients. When removing a field in a future revision, always add a `reserved`
+// statement to prevent field-number reuse.
 type TaskServiceServer interface {
+	// ClaimTask atomically assigns the next eligible task to the calling worker
+	// and marks it as claimed. Returns gRPC NOT_FOUND when the queue is empty;
+	// clients should treat NOT_FOUND as a benign "try again later" signal, not a
+	// real failure to log.
 	ClaimTask(context.Context, *ClaimTaskRequest) (*ClaimTaskResponse, error)
+	// Heartbeat renews the caller's lease on a previously claimed task. The
+	// first heartbeat transitions the task from `claimed` to `running`;
+	// subsequent heartbeats refresh its last-seen timestamp. Returns
+	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
+	// ReportResult finalizes a task the caller owns. A success marks the task
+	// `completed`; a failure either retries with linear backoff or transitions
+	// the task to `failed` once `max_attempts` is exhausted. Returns
+	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	ReportResult(context.Context, *ReportResultRequest) (*ReportResultResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
