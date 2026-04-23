@@ -157,6 +157,8 @@ func (s *Server) tasksMember(w http.ResponseWriter, r *http.Request) {
 		s.tasksDelete(w, r, id)
 	case verb == "requeue" && r.Method == http.MethodPost:
 		s.tasksRequeue(w, r, id)
+	case verb == "links" && r.Method == http.MethodPost:
+		s.tasksUpdateLinks(w, r, id)
 	default:
 		http.NotFound(w, r)
 	}
@@ -220,6 +222,41 @@ func (s *Server) tasksUpdate(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+}
+
+func (s *Server) tasksUpdateLinks(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jira := strings.TrimSpace(r.FormValue("jira_url"))
+	pr := strings.TrimSpace(r.FormValue("github_pr_url"))
+
+	var jiraPtr, prPtr *string
+	if jira != "" {
+		if err := issuerefs.ValidateJira(jira); err != nil {
+			http.Error(w, "JIRA URL must look like https://<host>/browse/PROJ-123", http.StatusBadRequest)
+			return
+		}
+		jiraPtr = &jira
+	}
+	if pr != "" {
+		if err := issuerefs.ValidatePR(pr); err != nil {
+			http.Error(w, "GitHub PR URL must look like https://<host>/<org>/<repo>/pull/123", http.StatusBadRequest)
+			return
+		}
+		prPtr = &pr
+	}
+
+	if _, err := s.store.UpdateTaskLinks(r.Context(), id, jiraPtr, prPtr); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -150,3 +150,57 @@ func TestDeleteTask(t *testing.T) {
 		t.Errorf("code=%d", rr.Code)
 	}
 }
+
+func TestUpdateLinks_WorksOnFailedTask(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "x", MaxAttempts: 3})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	// Force the task into "failed".
+	if _, err := s.Pool().Exec(context.Background(), `UPDATE tasks SET status='failed' WHERE id=$1`, task.ID); err != nil {
+		t.Fatalf("force status: %v", err)
+	}
+
+	form := url.Values{
+		"jira_url":      {"https://acme.atlassian.net/browse/PROJ-9"},
+		"github_pr_url": {"https://github.com/acme/widget/pull/42"},
+	}.Encode()
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/links", form))
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.JiraURL == nil || *got.JiraURL != "https://acme.atlassian.net/browse/PROJ-9" {
+		t.Errorf("JiraURL not saved: %v", got.JiraURL)
+	}
+	if got.GithubPRURL == nil || *got.GithubPRURL != "https://github.com/acme/widget/pull/42" {
+		t.Errorf("GithubPRURL not saved: %v", got.GithubPRURL)
+	}
+}
+
+func TestUpdateLinks_InvalidJira(t *testing.T) {
+	srv := newServer(t)
+	s, _ := store.Open(context.Background(), testDSN)
+	defer s.Close()
+	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{Name: "x", MaxAttempts: 3})
+
+	form := url.Values{"jira_url": {"nope"}}.Encode()
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/links", form))
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("code=%d want 400", rr.Code)
+	}
+}
