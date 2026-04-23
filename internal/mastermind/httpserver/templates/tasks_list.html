@@ -1,0 +1,19 @@
+{{ define "content" }}
+<h1>Tasks</h1>
+<form method="get" action="/tasks">
+  <label>Status
+    <select name="status" onchange="this.form.submit()">
+      <option value="">all</option>
+      {{ range .Statuses }}
+        <option value="{{ . }}" {{ if eq . $.CurrentStatus }}selected{{ end }}>{{ . }}</option>
+      {{ end }}
+    </select>
+  </label>
+</form>
+<div id="task-table"
+     hx-get="/tasks/fragment{{ if .CurrentStatus }}?status={{ .CurrentStatus }}{{ end }}"
+     hx-trigger="every 3s"
+     hx-swap="innerHTML">
+  {{ template "tasks_fragment" . }}
+</div>
+{{ end }}

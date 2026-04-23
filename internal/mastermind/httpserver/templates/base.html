@@ -1,0 +1,26 @@
+{{ define "base" }}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ .Title }} — mastermind</title>
+  <link rel="stylesheet" href="/static/pico.min.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<main class="container">
+  <nav>
+    <ul>
+      <li><strong>el-pulpo-ai</strong></li>
+    </ul>
+    <ul>
+      <li><a href="/tasks">Tasks</a></li>
+      <li><a href="/tasks/new">New</a></li>
+    </ul>
+  </nav>
+  {{ template "content" . }}
+</main>
+</body>
+</html>
+{{ end }}

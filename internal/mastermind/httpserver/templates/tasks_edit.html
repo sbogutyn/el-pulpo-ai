@@ -1,0 +1,13 @@
+{{ define "content" }}
+<h1>Edit task</h1>
+{{ if .Error }}<p role="alert">{{ .Error }}</p>{{ end }}
+<form method="post" action="/tasks/{{ .Task.ID }}">
+  <label>Name <input name="name" required value="{{ .Form.Name }}"></label>
+  <label>Priority <input type="number" name="priority" value="{{ .Form.Priority }}"></label>
+  <label>Max attempts <input type="number" name="max_attempts" value="{{ .Form.MaxAttempts }}" min="1"></label>
+  <label>Scheduled for <input type="datetime-local" name="scheduled_for" value="{{ .Form.ScheduledFor }}"></label>
+  <label>Payload (JSON) <textarea name="payload" rows="6">{{ .Form.Payload }}</textarea></label>
+  <button type="submit">Save</button>
+  <a href="/tasks/{{ .Task.ID }}" role="button" class="secondary">Cancel</a>
+</form>
+{{ end }}

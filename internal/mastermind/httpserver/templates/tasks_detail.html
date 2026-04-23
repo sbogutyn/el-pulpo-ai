@@ -1,0 +1,28 @@
+{{ define "content" }}
+<h1>{{ .Task.Name }}</h1>
+<p><strong>Status:</strong> {{ .Task.Status }}</p>
+<p><strong>Priority:</strong> {{ .Task.Priority }}</p>
+<p><strong>Attempts:</strong> {{ .Task.AttemptCount }} / {{ .Task.MaxAttempts }}</p>
+<p><strong>Claimed by:</strong> {{ if .Task.ClaimedBy }}{{ .Task.ClaimedBy }}{{ else }}—{{ end }}</p>
+<p><strong>Last heartbeat:</strong> {{ if .Task.LastHeartbeatAt }}{{ .Task.LastHeartbeatAt }}{{ else }}—{{ end }}</p>
+<p><strong>Last error:</strong> {{ if .Task.LastError }}<code>{{ .Task.LastError }}</code>{{ else }}—{{ end }}</p>
+<pre>{{ printf "%s" .Task.Payload }}</pre>
+
+<div class="grid">
+  {{ if eq .Task.Status "pending" }}
+    <a href="/tasks/{{ .Task.ID }}/edit" role="button">Edit</a>
+  {{ end }}
+  {{ if or (eq .Task.Status "completed") (eq .Task.Status "failed") }}
+    <form method="post" action="/tasks/{{ .Task.ID }}/requeue">
+      <button type="submit">Requeue</button>
+    </form>
+  {{ end }}
+  {{ if ne .Task.Status "claimed" }}{{ if ne .Task.Status "running" }}
+    <form method="post" action="/tasks/{{ .Task.ID }}/delete"
+          onsubmit="return confirm('Delete this task?');">
+      <button type="submit" class="contrast">Delete</button>
+    </form>
+  {{ end }}{{ end }}
+</div>
+<p><a href="/tasks">← back</a></p>
+{{ end }}

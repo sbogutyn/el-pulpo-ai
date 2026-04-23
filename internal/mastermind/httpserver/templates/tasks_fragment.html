@@ -1,0 +1,29 @@
+{{ define "tasks_fragment" }}
+<table role="grid">
+  <thead>
+    <tr><th>Name</th><th>Status</th><th>Priority</th><th>Attempts</th><th>Claimed by</th><th>Updated</th><th></th></tr>
+  </thead>
+  <tbody>
+    {{ range .Items }}
+      <tr>
+        <td><a href="/tasks/{{ .ID }}">{{ .Name }}</a></td>
+        <td>{{ .Status }}</td>
+        <td>{{ .Priority }}</td>
+        <td>{{ .AttemptCount }} / {{ .MaxAttempts }}</td>
+        <td>{{ if .ClaimedBy }}{{ .ClaimedBy }}{{ else }}—{{ end }}</td>
+        <td>{{ .UpdatedAt.Format "2006-01-02 15:04:05" }}</td>
+        <td>
+          {{ if or (eq .Status "failed") (eq .Status "completed") }}
+            <form method="post" action="/tasks/{{ .ID }}/requeue" hx-post="/tasks/{{ .ID }}/requeue" hx-target="#task-table">
+              <button type="submit" class="secondary">requeue</button>
+            </form>
+          {{ end }}
+        </td>
+      </tr>
+    {{ else }}
+      <tr><td colspan="7"><em>no tasks</em></td></tr>
+    {{ end }}
+  </tbody>
+</table>
+<p>{{ .Total }} total</p>
+{{ end }}
