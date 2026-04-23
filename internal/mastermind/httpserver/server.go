@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -31,16 +32,32 @@ type Server struct {
 	store *store.Store
 	cfg   Config
 	log   *slog.Logger
-	tpl   *template.Template
+	pages map[string]*template.Template
 	mux   *http.ServeMux
 }
 
 func New(s *store.Store, cfg Config, log *slog.Logger) (*Server, error) {
-	tpl, err := template.ParseFS(templatesFS, "templates/*.html")
-	if err != nil {
-		return nil, err
+	pages := map[string]*template.Template{}
+	pageFiles := map[string][]string{
+		"tasks_list":   {"templates/base.html", "templates/tasks_list.html", "templates/tasks_fragment.html"},
+		"tasks_new":    {"templates/base.html", "templates/tasks_new.html"},
+		"tasks_edit":   {"templates/base.html", "templates/tasks_edit.html"},
+		"tasks_detail": {"templates/base.html", "templates/tasks_detail.html"},
 	}
-	srv := &Server{store: s, cfg: cfg, log: log, tpl: tpl, mux: http.NewServeMux()}
+	for name, files := range pageFiles {
+		t, err := template.ParseFS(templatesFS, files...)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", name, err)
+		}
+		pages[name] = t
+	}
+	fragTree, err := template.ParseFS(templatesFS, "templates/tasks_fragment.html")
+	if err != nil {
+		return nil, fmt.Errorf("parse tasks_fragment: %w", err)
+	}
+	pages["tasks_fragment"] = fragTree
+
+	srv := &Server{store: s, cfg: cfg, log: log, pages: pages, mux: http.NewServeMux()}
 	srv.routes()
 	return srv, nil
 }
