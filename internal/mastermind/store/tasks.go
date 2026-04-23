@@ -153,3 +153,82 @@ func itoa(i int) string {
 	// Small helper to avoid importing strconv for a single-digit placeholder index.
 	return string(rune('0' + i))
 }
+
+var (
+	ErrNotEditable    = errors.New("task: not editable (only pending tasks can be edited)")
+	ErrNotDeletable   = errors.New("task: not deletable while active")
+	ErrNotRequeueable = errors.New("task: cannot requeue while active")
+)
+
+type UpdateTaskInput struct {
+	Name         string
+	Priority     int
+	MaxAttempts  int
+	ScheduledFor *time.Time
+	Payload      json.RawMessage
+}
+
+func (s *Store) UpdateTask(ctx context.Context, id uuid.UUID, in UpdateTaskInput) (Task, error) {
+	row := s.pool.QueryRow(ctx, `
+      UPDATE tasks
+      SET name          = $2,
+          priority      = $3,
+          max_attempts  = $4,
+          scheduled_for = $5,
+          payload       = COALESCE($6, payload),
+          updated_at    = now()
+      WHERE id = $1 AND status = 'pending'
+      RETURNING `+taskColumns,
+		id, in.Name, in.Priority, in.MaxAttempts, in.ScheduledFor, in.Payload,
+	)
+	t, err := scanTask(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Either missing or not pending.
+		if _, getErr := s.GetTask(ctx, id); getErr == ErrNotFound {
+			return Task{}, ErrNotFound
+		}
+		return Task{}, ErrNotEditable
+	}
+	return t, err
+}
+
+func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID) error {
+	ct, err := s.pool.Exec(ctx, `
+      DELETE FROM tasks
+      WHERE id = $1 AND status IN ('pending','completed','failed')
+    `, id)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		if _, getErr := s.GetTask(ctx, id); getErr == ErrNotFound {
+			return ErrNotFound
+		}
+		return ErrNotDeletable
+	}
+	return nil
+}
+
+func (s *Store) RequeueTask(ctx context.Context, id uuid.UUID) (Task, error) {
+	row := s.pool.QueryRow(ctx, `
+      UPDATE tasks
+      SET status            = 'pending',
+          claimed_by        = NULL,
+          claimed_at        = NULL,
+          last_heartbeat_at = NULL,
+          completed_at      = NULL,
+          last_error        = NULL,
+          attempt_count     = 0,
+          scheduled_for     = NULL,
+          updated_at        = now()
+      WHERE id = $1 AND status IN ('pending','completed','failed')
+      RETURNING `+taskColumns, id)
+	t, err := scanTask(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if _, getErr := s.GetTask(ctx, id); getErr == ErrNotFound {
+			return Task{}, ErrNotFound
+		}
+		return Task{}, ErrNotRequeueable
+	}
+	return t, err
+}
