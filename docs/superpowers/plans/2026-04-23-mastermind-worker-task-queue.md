@@ -3715,7 +3715,6 @@ package runner
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"math/rand"
 	"time"
@@ -3742,6 +3741,12 @@ type Runner struct {
 func New(c pb.TaskServiceClient, cfg Config, log *slog.Logger) *Runner {
 	if cfg.WorkDuration == 0 {
 		cfg.WorkDuration = time.Minute
+	}
+	if cfg.PollInterval <= 0 {
+		cfg.PollInterval = 2 * time.Second
+	}
+	if cfg.HeartbeatInterval <= 0 {
+		cfg.HeartbeatInterval = 10 * time.Second
 	}
 	return &Runner{client: c, cfg: cfg, log: log}
 }
@@ -3802,7 +3807,7 @@ func (r *Runner) heartbeatLoop(ctx context.Context, taskID string, log *slog.Log
 			return
 		case <-t.C:
 			if _, err := r.client.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: r.cfg.WorkerID, TaskId: taskID}); err != nil {
-				if errors.Is(ctx.Err(), context.Canceled) {
+				if ctx.Err() != nil {
 					return
 				}
 				log.Warn("heartbeat failed", "error", err)
@@ -3823,7 +3828,10 @@ func (r *Runner) fakeWork(ctx context.Context) error {
 }
 
 func sleepWithJitter(ctx context.Context, base time.Duration) bool {
-	jitter := time.Duration(rand.Int63n(int64(base) / 4))
+	var jitter time.Duration
+	if q := int64(base) / 4; q > 0 {
+		jitter = time.Duration(rand.Int63n(q))
+	}
 	t := time.NewTimer(base + jitter)
 	defer t.Stop()
 	select {
