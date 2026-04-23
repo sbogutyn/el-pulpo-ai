@@ -203,3 +203,35 @@ func TestUpdateLinks_InvalidJira(t *testing.T) {
 		t.Errorf("code=%d want 400", rr.Code)
 	}
 }
+
+func TestDetailPage_ShowsRefsAndUpdateForm(t *testing.T) {
+	srv := newServer(t)
+	s, _ := store.Open(context.Background(), testDSN)
+	defer s.Close()
+
+	jira := "https://acme.atlassian.net/browse/PROJ-5"
+	pr := "https://github.com/acme/widget/pull/11"
+	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{
+		Name: "detail", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+	})
+	// Force a non-pending status to prove the update form is still shown.
+	if _, err := s.Pool().Exec(context.Background(), `UPDATE tasks SET status='failed' WHERE id=$1`, task.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodGet, "/tasks/"+task.ID.String(), ""))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("code=%d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "PROJ-5") {
+		t.Errorf("detail missing JIRA short form: %s", body)
+	}
+	if !strings.Contains(body, "acme/widget#11") {
+		t.Errorf("detail missing PR short form: %s", body)
+	}
+	if !strings.Contains(body, `action="/tasks/`+task.ID.String()+`/links"`) {
+		t.Errorf("detail missing link-update form: %s", body)
+	}
+}
