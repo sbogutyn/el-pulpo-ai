@@ -89,7 +89,9 @@ func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.U
 // ReapStale reclaims tasks whose last_heartbeat_at is older than the given
 // visibility timeout. Returns the number of rows affected.
 func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (int64, error) {
-	secs := int(visibility.Seconds())
+	// Use microseconds so sub-second visibilities are honoured (integer
+	// seconds would truncate e.g. 500ms to 0 and reap everything).
+	usecs := visibility.Microseconds()
 	ct, err := s.pool.Exec(ctx, `
       UPDATE tasks
       SET status            = CASE
@@ -115,8 +117,8 @@ func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (int64,
           last_error        = 'lease expired',
           updated_at        = now()
       WHERE status IN ('claimed','running')
-        AND last_heartbeat_at < now() - make_interval(secs => $1)
-    `, secs)
+        AND last_heartbeat_at < now() - make_interval(secs => $1::double precision / 1000000)
+    `, usecs)
 	if err != nil {
 		return 0, err
 	}
