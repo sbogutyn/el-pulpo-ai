@@ -1,5 +1,6 @@
 {{ define "content" }}
 <h1>{{ .Task.Name }}</h1>
+{{ if .Error }}<p role="alert">{{ .Error }}</p>{{ end }}
 <p><strong>Status:</strong> {{ .Task.Status }}</p>
 <p><strong>Priority:</strong> {{ .Task.Priority }}</p>
 <p><strong>Attempts:</strong> {{ .Task.AttemptCount }} / {{ .Task.MaxAttempts }}</p>

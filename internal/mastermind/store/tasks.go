@@ -171,6 +171,11 @@ var (
 	ErrNotRequeueable = errors.New("task: cannot requeue while active")
 )
 
+// UpdateTaskInput carries the fields editable by UpdateTask, which only
+// succeeds while a task is still pending. JiraURL and GithubPRURL are
+// included here so the pending-only edit form can set them alongside the
+// other fields; for attaching or changing refs after a task has run
+// (running/completed/failed), use UpdateTaskLinks instead.
 type UpdateTaskInput struct {
 	Name         string
 	Priority     int

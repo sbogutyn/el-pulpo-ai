@@ -43,6 +43,7 @@ type formPageData struct {
 type detailPageData struct {
 	Title string
 	Task  store.Task
+	Error string
 }
 
 func (s *Server) registerTasksRoutes() {
@@ -239,14 +240,14 @@ func (s *Server) tasksUpdateLinks(w http.ResponseWriter, r *http.Request, id uui
 	var jiraPtr, prPtr *string
 	if jira != "" {
 		if err := issuerefs.ValidateJira(jira); err != nil {
-			http.Error(w, "JIRA URL must look like https://<host>/browse/PROJ-123", http.StatusBadRequest)
+			s.renderDetailError(w, r, id, "JIRA URL must look like https://<host>/browse/PROJ-123", http.StatusBadRequest)
 			return
 		}
 		jiraPtr = &jira
 	}
 	if pr != "" {
 		if err := issuerefs.ValidatePR(pr); err != nil {
-			http.Error(w, "GitHub PR URL must look like https://<host>/<org>/<repo>/pull/123", http.StatusBadRequest)
+			s.renderDetailError(w, r, id, "GitHub PR URL must look like https://<host>/<org>/<repo>/pull/123", http.StatusBadRequest)
 			return
 		}
 		prPtr = &pr
@@ -261,6 +262,22 @@ func (s *Server) tasksUpdateLinks(w http.ResponseWriter, r *http.Request, id uui
 		return
 	}
 	http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+}
+
+func (s *Server) renderDetailError(w http.ResponseWriter, r *http.Request, id uuid.UUID, msg string, code int) {
+	task, err := s.store.GetTask(r.Context(), id)
+	if errors.Is(err, store.ErrNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(code)
+	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Error: msg}); err != nil {
+		s.log.Error("render tasks_detail", "error", err)
+	}
 }
 
 func (s *Server) tasksDelete(w http.ResponseWriter, r *http.Request, id uuid.UUID) {

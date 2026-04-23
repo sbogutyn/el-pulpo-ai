@@ -202,6 +202,49 @@ func TestUpdateLinks_InvalidJira(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("code=%d want 400", rr.Code)
 	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `role="alert"`) {
+		t.Errorf("response missing error banner: %s", body)
+	}
+	if !strings.Contains(body, "JIRA URL must look like") {
+		t.Errorf("response missing JIRA validation message: %s", body)
+	}
+}
+
+func TestUpdateLinks_EmptyFormClearsRefs(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	jira := "https://acme.atlassian.net/browse/PROJ-1"
+	pr := "https://github.com/acme/widget/pull/2"
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{
+		Name: "clear-refs", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	form := url.Values{"jira_url": {""}, "github_pr_url": {""}}.Encode()
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/links", form))
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("code=%d body=%s", rr.Code, rr.Body.String())
+	}
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.JiraURL != nil {
+		t.Errorf("JiraURL not cleared: %q", *got.JiraURL)
+	}
+	if got.GithubPRURL != nil {
+		t.Errorf("GithubPRURL not cleared: %q", *got.GithubPRURL)
+	}
 }
 
 func TestDetailPage_ShowsRefsAndUpdateForm(t *testing.T) {
