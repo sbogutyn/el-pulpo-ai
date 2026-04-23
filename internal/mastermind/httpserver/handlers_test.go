@@ -69,7 +69,6 @@ func TestCreateTask_InvalidJSON(t *testing.T) {
 }
 
 func TestCreateTask_WithIssueRefs(t *testing.T) {
-	t.Skip("enabled in Task 12 once list template renders short forms")
 	srv := newServer(t)
 
 	form := url.Values{

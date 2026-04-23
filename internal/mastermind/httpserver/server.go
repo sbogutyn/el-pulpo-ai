@@ -41,6 +41,12 @@ func New(s *store.Store, cfg Config, log *slog.Logger) (*Server, error) {
 	funcs := template.FuncMap{
 		"jiraShort": issuerefs.JiraShort,
 		"prShort":   issuerefs.PRShort,
+		"deref": func(s *string) string {
+			if s == nil {
+				return ""
+			}
+			return *s
+		},
 	}
 
 	pages := map[string]*template.Template{}
