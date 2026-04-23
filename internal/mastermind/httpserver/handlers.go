@@ -73,6 +73,7 @@ func (s *Server) tasksList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) tasksFragment(w http.ResponseWriter, r *http.Request) {
 	data := s.buildListData(r)
 	if err := s.pages["tasks_fragment"].ExecuteTemplate(w, "tasks_fragment", data); err != nil {
+		s.log.Error("render tasks_fragment", "error", err)
 		http.Error(w, "render error", http.StatusInternalServerError)
 	}
 }
@@ -101,10 +102,13 @@ func (s *Server) tasksNewForm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	_ = s.pages["tasks_new"].ExecuteTemplate(w, "base", formPageData{
+	if err := s.pages["tasks_new"].ExecuteTemplate(w, "base", formPageData{
 		Title: "New task",
 		Form:  taskForm{MaxAttempts: 3, Payload: "{}"},
-	})
+	}); err != nil {
+		s.log.Error("render tasks_new", "error", err)
+		http.Error(w, "render error", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) tasksCreate(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +169,10 @@ func (s *Server) tasksDetail(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	_ = s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task})
+	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task}); err != nil {
+		s.log.Error("render tasks_detail", "error", err)
+		http.Error(w, "render error", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) tasksEditForm(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
@@ -178,11 +185,14 @@ func (s *Server) tasksEditForm(w http.ResponseWriter, r *http.Request, id uuid.U
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	_ = s.pages["tasks_edit"].ExecuteTemplate(w, "base", formPageData{
+	if err := s.pages["tasks_edit"].ExecuteTemplate(w, "base", formPageData{
 		Title: "Edit " + task.Name,
 		Task:  &task,
 		Form:  formFromTask(task),
-	})
+	}); err != nil {
+		s.log.Error("render tasks_edit", "error", err)
+		http.Error(w, "render error", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) tasksUpdate(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
@@ -253,11 +263,17 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 		Payload:      r.FormValue("payload"),
 	}
 	if s := r.FormValue("priority"); s != "" {
-		n, _ := strconv.Atoi(s)
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return f, store.NewTaskInput{}, errors.New("priority must be an integer")
+		}
 		f.Priority = n
 	}
 	if s := r.FormValue("max_attempts"); s != "" {
-		n, _ := strconv.Atoi(s)
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return f, store.NewTaskInput{}, errors.New("max_attempts must be an integer")
+		}
 		f.MaxAttempts = n
 	}
 	if f.MaxAttempts <= 0 {
@@ -278,7 +294,7 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 		Payload:     payloadJSON,
 	}
 	if f.ScheduledFor != "" {
-		t, err := time.Parse("2006-01-02T15:04", f.ScheduledFor)
+		t, err := time.ParseInLocation("2006-01-02T15:04", f.ScheduledFor, time.Local)
 		if err != nil {
 			return f, store.NewTaskInput{}, errors.New("scheduled_for must be YYYY-MM-DDTHH:MM")
 		}
@@ -295,12 +311,15 @@ func formFromTask(t store.Task) taskForm {
 		Payload:     string(t.Payload),
 	}
 	if t.ScheduledFor != nil {
-		tf.ScheduledFor = t.ScheduledFor.Format("2006-01-02T15:04")
+		tf.ScheduledFor = t.ScheduledFor.In(time.Local).Format("2006-01-02T15:04")
 	}
 	return tf
 }
 
 func renderFormError(w http.ResponseWriter, s *Server, pageKey string, data formPageData, code int) {
 	w.WriteHeader(code)
-	_ = s.pages[pageKey].ExecuteTemplate(w, "base", data)
+	if err := s.pages[pageKey].ExecuteTemplate(w, "base", data); err != nil {
+		// headers already sent; can only log.
+		s.log.Error("render form", "page", pageKey, "error", err)
+	}
 }
