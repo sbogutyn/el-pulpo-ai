@@ -2554,24 +2554,28 @@ git commit -m "feat(metrics): Prometheus collectors for the mastermind"
 **Files:**
 - Create: `internal/mastermind/httpserver/server.go`
 - Create: `internal/mastermind/httpserver/server_test.go`
-- Create: `internal/mastermind/templates/base.html`
-- Create: `internal/mastermind/templates/tasks_list.html`
-- Create: `internal/mastermind/templates/tasks_fragment.html`
-- Create: `internal/mastermind/templates/tasks_new.html`
-- Create: `internal/mastermind/templates/tasks_edit.html`
-- Create: `internal/mastermind/templates/tasks_detail.html`
-- Create: `internal/mastermind/static/pico.min.css` (fetched)
-- Create: `internal/mastermind/static/htmx.min.js` (fetched)
+- Create: `internal/mastermind/httpserver/templates/base.html`
+- Create: `internal/mastermind/httpserver/templates/tasks_list.html`
+- Create: `internal/mastermind/httpserver/templates/tasks_fragment.html`
+- Create: `internal/mastermind/httpserver/templates/tasks_new.html`
+- Create: `internal/mastermind/httpserver/templates/tasks_edit.html`
+- Create: `internal/mastermind/httpserver/templates/tasks_detail.html`
+- Create: `internal/mastermind/httpserver/static/pico.min.css` (fetched)
+- Create: `internal/mastermind/httpserver/static/htmx.min.js` (fetched)
+
+Templates and static assets live **inside** the `httpserver` package because
+`//go:embed` cannot traverse parent directories.
 
 - [ ] **Step 1: Download static assets**
 
 ```bash
-curl -sSL https://unpkg.com/@picocss/pico@2/css/pico.min.css -o internal/mastermind/static/pico.min.css
-curl -sSL https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js     -o internal/mastermind/static/htmx.min.js
+mkdir -p internal/mastermind/httpserver/static
+curl -sSL https://unpkg.com/@picocss/pico@2/css/pico.min.css -o internal/mastermind/httpserver/static/pico.min.css
+curl -sSL https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js     -o internal/mastermind/httpserver/static/htmx.min.js
 ```
 Verify files are non-empty:
 ```bash
-wc -c internal/mastermind/static/*
+wc -c internal/mastermind/httpserver/static/*
 ```
 
 - [ ] **Step 2: Write `base.html`**
