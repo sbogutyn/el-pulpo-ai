@@ -152,3 +152,50 @@ func TestReapStale_ExhaustedGoesToFailed(t *testing.T) {
 		t.Errorf("status=%q, want failed", got.Status)
 	}
 }
+
+func TestReportResult_SuccessWrongOwnerFailsPrecondition(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	claimed, _ := s.ClaimTask(ctx, "w1")
+
+	err := s.ReportResult(ctx, "w2", claimed.ID, true, "")
+	if err != ErrNotOwner {
+		t.Errorf("got %v, want ErrNotOwner", err)
+	}
+	got, _ := s.GetTask(ctx, claimed.ID)
+	if got.Status != StatusClaimed {
+		t.Errorf("status=%q, want claimed", got.Status)
+	}
+	if got.CompletedAt != nil {
+		t.Errorf("completed_at=%v, want nil", got.CompletedAt)
+	}
+}
+
+func TestReportResult_FailureWrongOwnerFailsPrecondition(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	claimed, _ := s.ClaimTask(ctx, "w1")
+
+	err := s.ReportResult(ctx, "w2", claimed.ID, false, "bad")
+	if err != ErrNotOwner {
+		t.Errorf("got %v, want ErrNotOwner", err)
+	}
+	got, _ := s.GetTask(ctx, claimed.ID)
+	if got.Status != StatusClaimed {
+		t.Errorf("status=%q, want claimed", got.Status)
+	}
+	if got.LastError != nil {
+		t.Errorf("last_error=%v, want nil", got.LastError)
+	}
+	if got.ScheduledFor != nil {
+		t.Errorf("scheduled_for=%v, want nil", got.ScheduledFor)
+	}
+}
