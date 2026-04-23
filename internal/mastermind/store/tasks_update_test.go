@@ -165,3 +165,30 @@ func TestUpdateTaskLinks_NotFound(t *testing.T) {
 		t.Errorf("got %v, want ErrNotFound", err)
 	}
 }
+
+func TestRequeueTask_PreservesIssueRefs(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	jira := "https://acme.atlassian.net/browse/PROJ-77"
+	pr := "https://github.com/acme/widget/pull/5"
+	created, _ := s.CreateTask(ctx, NewTaskInput{
+		Name: "x", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+	})
+	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='failed' WHERE id=$1`, created.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	reset, err := s.RequeueTask(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("RequeueTask: %v", err)
+	}
+	if reset.JiraURL == nil || *reset.JiraURL != jira {
+		t.Errorf("JiraURL wiped on requeue: %v", reset.JiraURL)
+	}
+	if reset.GithubPRURL == nil || *reset.GithubPRURL != pr {
+		t.Errorf("GithubPRURL wiped on requeue: %v", reset.GithubPRURL)
+	}
+}
