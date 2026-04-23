@@ -187,7 +187,7 @@ func (s *Store) UpdateTask(ctx context.Context, id uuid.UUID, in UpdateTaskInput
 	t, err := scanTask(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Either missing or not pending.
-		if _, getErr := s.GetTask(ctx, id); getErr == ErrNotFound {
+		if _, getErr := s.GetTask(ctx, id); errors.Is(getErr, ErrNotFound) {
 			return Task{}, ErrNotFound
 		}
 		return Task{}, ErrNotEditable
@@ -204,7 +204,7 @@ func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID) error {
 		return err
 	}
 	if ct.RowsAffected() == 0 {
-		if _, getErr := s.GetTask(ctx, id); getErr == ErrNotFound {
+		if _, getErr := s.GetTask(ctx, id); errors.Is(getErr, ErrNotFound) {
 			return ErrNotFound
 		}
 		return ErrNotDeletable
@@ -228,7 +228,7 @@ func (s *Store) RequeueTask(ctx context.Context, id uuid.UUID) (Task, error) {
       RETURNING `+taskColumns, id)
 	t, err := scanTask(row)
 	if errors.Is(err, pgx.ErrNoRows) {
-		if _, getErr := s.GetTask(ctx, id); getErr == ErrNotFound {
+		if _, getErr := s.GetTask(ctx, id); errors.Is(getErr, ErrNotFound) {
 			return Task{}, ErrNotFound
 		}
 		return Task{}, ErrNotRequeueable
