@@ -2195,6 +2195,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -2208,7 +2209,7 @@ func TestMain(m *testing.M) {
 		postgres.WithUsername("pulpo"),
 		postgres.WithPassword("pulpo"),
 		postgres.BasicWaitStrategies(),
-		postgres.WithWaitStrategy(wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second)),
+		testcontainers.WithWaitStrategy(wait.ForListeningPort("5432/tcp").WithStartupTimeout(60*time.Second)),
 	)
 	if err != nil {
 		panic(err)
