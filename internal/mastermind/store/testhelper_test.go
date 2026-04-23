@@ -43,7 +43,8 @@ func runTests(m *testing.M) int {
 
 	dsn, err := ctr.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		log.Fatalf("ConnectionString: %v", err)
+		log.Printf("ConnectionString: %v", err)
+		return 1
 	}
 	testDSN = dsn
 
@@ -52,10 +53,12 @@ func runTests(m *testing.M) int {
 	migrationsDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "migrations")
 	mg, err := migrate.New("file://"+migrationsDir, dsn)
 	if err != nil {
-		log.Fatalf("migrate.New: %v", err)
+		log.Printf("migrate.New: %v", err)
+		return 1
 	}
 	if err := mg.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		log.Fatalf("migrate.Up: %v", err)
+		log.Printf("migrate.Up: %v", err)
+		return 1
 	}
 
 	return m.Run()
