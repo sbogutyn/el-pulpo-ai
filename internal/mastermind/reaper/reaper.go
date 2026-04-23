@@ -1,5 +1,4 @@
-// Package reaper runs a background goroutine that reclaims tasks whose
-// heartbeats have stopped for longer than the configured visibility timeout.
+// Package reaper reclaims tasks whose heartbeat exceeds the visibility timeout.
 package reaper
 
 import (
