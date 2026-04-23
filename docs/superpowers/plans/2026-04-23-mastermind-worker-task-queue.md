@@ -1705,35 +1705,94 @@ syntax = "proto3";
 
 package elpulpo.tasks.v1;
 
-option go_package = "github.com/sbogutyn/el-pulpo-ai/internal/proto;pb";
+option go_package = "github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1";
 
+// TaskService is the wire contract between the mastermind server and worker
+// clients. When removing a field in a future revision, always add a `reserved`
+// statement to prevent field-number reuse.
 service TaskService {
+  // ClaimTask atomically assigns the next eligible task to the calling worker
+  // and marks it as claimed. Returns gRPC NOT_FOUND when the queue is empty;
+  // clients should treat NOT_FOUND as a benign "try again later" signal, not a
+  // real failure to log.
   rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse);
+
+  // Heartbeat renews the caller's lease on a previously claimed task. The
+  // first heartbeat transitions the task from `claimed` to `running`;
+  // subsequent heartbeats refresh its last-seen timestamp. Returns
+  // FAILED_PRECONDITION when the caller no longer owns the claim.
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // ReportResult finalizes a task the caller owns. A success marks the task
+  // `completed`; a failure either retries with linear backoff or transitions
+  // the task to `failed` once `max_attempts` is exhausted. Returns
+  // FAILED_PRECONDITION when the caller no longer owns the claim.
   rpc ReportResult(ReportResultRequest) returns (ReportResultResponse);
 }
 
+// Task is the unit of work handed from mastermind to a worker.
 message Task {
-  string id      = 1;
-  string name    = 2;
-  bytes  payload = 3;
+  // Identifier assigned by mastermind. Matches the `id` column of the
+  // mastermind tasks table (UUID v4 serialized canonical 8-4-4-4-12).
+  string id = 1;
+
+  // Logical task type. Workers dispatch on this string to decide which
+  // handler to run.
+  string name = 2;
+
+  // Opaque, caller-defined JSON payload. Mastermind stores this verbatim and
+  // does not interpret it.
+  bytes payload = 3;
 }
 
-message ClaimTaskRequest  { string worker_id = 1; }
-message ClaimTaskResponse { Task task = 1; }
-
-message HeartbeatRequest  {
+// ClaimTaskRequest asks mastermind for the next available task.
+message ClaimTaskRequest {
+  // Stable identifier for the calling worker, typically "<hostname>-<pid>" or
+  // a UUID chosen at process start. Mastermind records this on the claim for
+  // debugging and poison-pill attribution.
   string worker_id = 1;
-  string task_id   = 2;
 }
+
+// ClaimTaskResponse carries a claimed task. On empty-queue the server returns
+// NOT_FOUND instead of an empty response, so `task` is guaranteed non-nil on
+// success.
+message ClaimTaskResponse {
+  Task task = 1;
+}
+
+// HeartbeatRequest refreshes the caller's lease on an owned task.
+message HeartbeatRequest {
+  string worker_id = 1;
+  string task_id = 2;
+}
+
 message HeartbeatResponse {}
 
+// ReportResultRequest finalizes a task with either success or failure.
+// `outcome` is a oneof so that "neither set" and "both set" are unrepresentable
+// on the wire.
 message ReportResultRequest {
-  string worker_id     = 1;
-  string task_id       = 2;
-  bool   success       = 3;
-  string error_message = 4;
+  string worker_id = 1;
+  string task_id = 2;
+
+  oneof outcome {
+    Success success = 3;
+    Failure failure = 4;
+  }
+
+  // Success signals the task completed. Empty today, but kept as a message
+  // (not a bare flag) so fields like output summary or timing can be added
+  // without a breaking change.
+  message Success {}
+
+  // Failure signals the task did not complete. `message` is surfaced as
+  // `last_error` in the mastermind tasks table and included in retry
+  // bookkeeping.
+  message Failure {
+    string message = 1;
+  }
 }
+
 message ReportResultResponse {}
 ```
 
@@ -2091,7 +2150,8 @@ func TestClaimThenReport_Success(t *testing.T) {
 		t.Fatalf("Heartbeat: %v", err)
 	}
 	if _, err := client.ReportResult(ctx, &pb.ReportResultRequest{
-		WorkerId: "w1", TaskId: taskID, Success: true,
+		WorkerId: "w1", TaskId: taskID,
+		Outcome: &pb.ReportResultRequest_Success_{Success: &pb.ReportResultRequest_Success{}},
 	}); err != nil {
 		t.Fatalf("ReportResult: %v", err)
 	}
@@ -2244,7 +2304,20 @@ func (s *Server) ReportResult(ctx context.Context, req *pb.ReportResultRequest) 
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "task_id must be a UUID")
 	}
-	if err := s.store.ReportResult(ctx, req.GetWorkerId(), id, req.GetSuccess(), req.GetErrorMessage()); err != nil {
+	var (
+		success bool
+		errMsg  string
+	)
+	switch outcome := req.GetOutcome().(type) {
+	case *pb.ReportResultRequest_Success_:
+		success = true
+	case *pb.ReportResultRequest_Failure_:
+		success = false
+		errMsg = outcome.Failure.GetMessage()
+	default:
+		return nil, status.Error(codes.InvalidArgument, "outcome is required (success or failure)")
+	}
+	if err := s.store.ReportResult(ctx, req.GetWorkerId(), id, success, errMsg); err != nil {
 		if errors.Is(err, store.ErrNotOwner) {
 			return nil, status.Error(codes.FailedPrecondition, "not the current owner of this task")
 		}
@@ -3700,9 +3773,13 @@ func (r *Runner) runOne(ctx context.Context, t *pb.Task) {
 	workErr := r.fakeWork(ctx)
 	cancel()
 
-	report := &pb.ReportResultRequest{WorkerId: r.cfg.WorkerID, TaskId: t.Id, Success: workErr == nil}
-	if workErr != nil {
-		report.ErrorMessage = workErr.Error()
+	report := &pb.ReportResultRequest{WorkerId: r.cfg.WorkerID, TaskId: t.Id}
+	if workErr == nil {
+		report.Outcome = &pb.ReportResultRequest_Success_{Success: &pb.ReportResultRequest_Success{}}
+	} else {
+		report.Outcome = &pb.ReportResultRequest_Failure_{
+			Failure: &pb.ReportResultRequest_Failure{Message: workErr.Error()},
+		}
 	}
 	if _, err := r.client.ReportResult(ctx, report); err != nil {
 		log.Warn("report failed", "error", err)
