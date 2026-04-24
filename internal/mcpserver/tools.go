@@ -81,15 +81,17 @@ func fromProtoTask(p *pb.TaskDetail) TaskDetail {
 }
 
 // CreateTaskInput is the MCP tool input for create_task. The SDK derives the
-// JSON schema from these struct tags.
+// JSON schema from these struct tags. Payload is `any` rather than
+// json.RawMessage because jsonschema-go emits "array | null" for []byte-backed
+// types, causing the SDK to reject any JSON-object payload.
 type CreateTaskInput struct {
-	Name         string          `json:"name" jsonschema:"the task type (required), 1-200 chars"`
-	Payload      json.RawMessage `json:"payload,omitempty" jsonschema:"opaque JSON payload, default {}"`
-	Priority     int32           `json:"priority,omitempty" jsonschema:"priority, default 0 (higher runs first)"`
-	MaxAttempts  int32           `json:"max_attempts,omitempty" jsonschema:"max attempts, default 3, range 1-50"`
-	ScheduledFor *time.Time      `json:"scheduled_for,omitempty" jsonschema:"earliest time the task is eligible to run (RFC3339)"`
-	JiraURL      string          `json:"jira_url,omitempty" jsonschema:"optional JIRA issue URL"`
-	GithubPRURL  string          `json:"github_pr_url,omitempty" jsonschema:"optional GitHub pull request URL"`
+	Name         string     `json:"name" jsonschema:"the task type (required), 1-200 chars"`
+	Payload      any        `json:"payload,omitempty" jsonschema:"opaque JSON payload, default {}"`
+	Priority     int32      `json:"priority,omitempty" jsonschema:"priority, default 0 (higher runs first)"`
+	MaxAttempts  int32      `json:"max_attempts,omitempty" jsonschema:"max attempts, default 3, range 1-50"`
+	ScheduledFor *time.Time `json:"scheduled_for,omitempty" jsonschema:"earliest time the task is eligible to run (RFC3339)"`
+	JiraURL      string     `json:"jira_url,omitempty" jsonschema:"optional JIRA issue URL"`
+	GithubPRURL  string     `json:"github_pr_url,omitempty" jsonschema:"optional GitHub pull request URL"`
 }
 
 func registerCreateTask(s *mcp.Server, admin pb.AdminServiceClient) {
@@ -97,9 +99,17 @@ func registerCreateTask(s *mcp.Server, admin pb.AdminServiceClient) {
 		Name:        "create_task",
 		Description: "Create a new task in the mastermind queue. Returns the created task.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in CreateTaskInput) (*mcp.CallToolResult, TaskDetail, error) {
+		var payload []byte
+		if in.Payload != nil {
+			b, err := json.Marshal(in.Payload)
+			if err != nil {
+				return toolErr(status.Error(codes.InvalidArgument, "payload must be JSON-encodable"), "create_task"), TaskDetail{}, nil
+			}
+			payload = b
+		}
 		req := &pb.CreateTaskRequest{
 			Name:        in.Name,
-			Payload:     []byte(in.Payload),
+			Payload:     payload,
 			Priority:    in.Priority,
 			MaxAttempts: in.MaxAttempts,
 			JiraUrl:     in.JiraURL,

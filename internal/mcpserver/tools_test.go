@@ -61,6 +61,39 @@ func TestCreateTaskTool_Happy(t *testing.T) {
 	}
 }
 
+func TestCreateTaskTool_WithPayload(t *testing.T) {
+	admin, _ := startAdminBuf(t)
+	session := startMCPClient(t, admin)
+
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "create_task",
+		Arguments: map[string]any{
+			"name":    "indexer",
+			"payload": map[string]any{"repo": "pulpo", "since": "2026-04-01"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("tool error: %+v", res.Content)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var out struct {
+		Name    string         `json:"name"`
+		Payload map[string]any `json:"payload"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Name != "indexer" {
+		t.Errorf("Name=%q, want indexer", out.Name)
+	}
+	if out.Payload["repo"] != "pulpo" || out.Payload["since"] != "2026-04-01" {
+		t.Errorf("Payload=%+v, want repo=pulpo since=2026-04-01", out.Payload)
+	}
+}
+
 func TestCreateTaskTool_MissingName_ToolError(t *testing.T) {
 	admin, _ := startAdminBuf(t)
 	session := startMCPClient(t, admin)
