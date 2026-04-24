@@ -9,6 +9,7 @@ package tasksv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -409,6 +410,517 @@ func (*ReportResultResponse) Descriptor() ([]byte, []int) {
 	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{6}
 }
 
+// TaskDetail mirrors the mastermind `tasks` row. Nullable columns become empty
+// strings or zero timestamps on the wire; the MCP adapter omits them when
+// serializing to JSON.
+type TaskDetail struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Payload         []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	Priority        int32                  `protobuf:"varint,4,opt,name=priority,proto3" json:"priority,omitempty"`
+	Status          string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	ScheduledFor    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	AttemptCount    int32                  `protobuf:"varint,7,opt,name=attempt_count,json=attemptCount,proto3" json:"attempt_count,omitempty"`
+	MaxAttempts     int32                  `protobuf:"varint,8,opt,name=max_attempts,json=maxAttempts,proto3" json:"max_attempts,omitempty"`
+	ClaimedBy       string                 `protobuf:"bytes,9,opt,name=claimed_by,json=claimedBy,proto3" json:"claimed_by,omitempty"`
+	ClaimedAt       *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=claimed_at,json=claimedAt,proto3" json:"claimed_at,omitempty"`
+	LastHeartbeatAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=last_heartbeat_at,json=lastHeartbeatAt,proto3" json:"last_heartbeat_at,omitempty"`
+	CompletedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	LastError       string                 `protobuf:"bytes,13,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	JiraUrl         string                 `protobuf:"bytes,14,opt,name=jira_url,json=jiraUrl,proto3" json:"jira_url,omitempty"`
+	GithubPrUrl     string                 `protobuf:"bytes,15,opt,name=github_pr_url,json=githubPrUrl,proto3" json:"github_pr_url,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TaskDetail) Reset() {
+	*x = TaskDetail{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskDetail) ProtoMessage() {}
+
+func (x *TaskDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskDetail.ProtoReflect.Descriptor instead.
+func (*TaskDetail) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TaskDetail) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *TaskDetail) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TaskDetail) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *TaskDetail) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+func (x *TaskDetail) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *TaskDetail) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+func (x *TaskDetail) GetAttemptCount() int32 {
+	if x != nil {
+		return x.AttemptCount
+	}
+	return 0
+}
+
+func (x *TaskDetail) GetMaxAttempts() int32 {
+	if x != nil {
+		return x.MaxAttempts
+	}
+	return 0
+}
+
+func (x *TaskDetail) GetClaimedBy() string {
+	if x != nil {
+		return x.ClaimedBy
+	}
+	return ""
+}
+
+func (x *TaskDetail) GetClaimedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ClaimedAt
+	}
+	return nil
+}
+
+func (x *TaskDetail) GetLastHeartbeatAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastHeartbeatAt
+	}
+	return nil
+}
+
+func (x *TaskDetail) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
+func (x *TaskDetail) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+func (x *TaskDetail) GetJiraUrl() string {
+	if x != nil {
+		return x.JiraUrl
+	}
+	return ""
+}
+
+func (x *TaskDetail) GetGithubPrUrl() string {
+	if x != nil {
+		return x.GithubPrUrl
+	}
+	return ""
+}
+
+func (x *TaskDetail) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *TaskDetail) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type CreateTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
+	Priority      int32                  `protobuf:"varint,3,opt,name=priority,proto3" json:"priority,omitempty"`
+	MaxAttempts   int32                  `protobuf:"varint,4,opt,name=max_attempts,json=maxAttempts,proto3" json:"max_attempts,omitempty"`
+	ScheduledFor  *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=scheduled_for,json=scheduledFor,proto3" json:"scheduled_for,omitempty"`
+	JiraUrl       string                 `protobuf:"bytes,6,opt,name=jira_url,json=jiraUrl,proto3" json:"jira_url,omitempty"`
+	GithubPrUrl   string                 `protobuf:"bytes,7,opt,name=github_pr_url,json=githubPrUrl,proto3" json:"github_pr_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTaskRequest) Reset() {
+	*x = CreateTaskRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTaskRequest) ProtoMessage() {}
+
+func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTaskRequest.ProtoReflect.Descriptor instead.
+func (*CreateTaskRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CreateTaskRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *CreateTaskRequest) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+func (x *CreateTaskRequest) GetMaxAttempts() int32 {
+	if x != nil {
+		return x.MaxAttempts
+	}
+	return 0
+}
+
+func (x *CreateTaskRequest) GetScheduledFor() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledFor
+	}
+	return nil
+}
+
+func (x *CreateTaskRequest) GetJiraUrl() string {
+	if x != nil {
+		return x.JiraUrl
+	}
+	return ""
+}
+
+func (x *CreateTaskRequest) GetGithubPrUrl() string {
+	if x != nil {
+		return x.GithubPrUrl
+	}
+	return ""
+}
+
+type CreateTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *TaskDetail            `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTaskResponse) Reset() {
+	*x = CreateTaskResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTaskResponse) ProtoMessage() {}
+
+func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTaskResponse.ProtoReflect.Descriptor instead.
+func (*CreateTaskResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CreateTaskResponse) GetTask() *TaskDetail {
+	if x != nil {
+		return x.Task
+	}
+	return nil
+}
+
+type GetTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskRequest) Reset() {
+	*x = GetTaskRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskRequest) ProtoMessage() {}
+
+func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskRequest.ProtoReflect.Descriptor instead.
+func (*GetTaskRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetTaskRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *TaskDetail            `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskResponse) Reset() {
+	*x = GetTaskResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskResponse) ProtoMessage() {}
+
+func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskResponse.ProtoReflect.Descriptor instead.
+func (*GetTaskResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetTaskResponse) GetTask() *TaskDetail {
+	if x != nil {
+		return x.Task
+	}
+	return nil
+}
+
+type ListTasksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTasksRequest) Reset() {
+	*x = ListTasksRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTasksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksRequest) ProtoMessage() {}
+
+func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
+func (*ListTasksRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListTasksRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ListTasksRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListTasksRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type ListTasksResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*TaskDetail          `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTasksResponse) Reset() {
+	*x = ListTasksResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTasksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksResponse) ProtoMessage() {}
+
+func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
+func (*ListTasksResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListTasksResponse) GetItems() []*TaskDetail {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ListTasksResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
 // Success signals the task completed. Empty today, but kept as a message
 // (not a bare flag) so fields like output summary or timing can be added
 // without a breaking change.
@@ -420,7 +932,7 @@ type ReportResultRequest_Success struct {
 
 func (x *ReportResultRequest_Success) Reset() {
 	*x = ReportResultRequest_Success{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	mi := &file_internal_proto_tasks_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -432,7 +944,7 @@ func (x *ReportResultRequest_Success) String() string {
 func (*ReportResultRequest_Success) ProtoMessage() {}
 
 func (x *ReportResultRequest_Success) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	mi := &file_internal_proto_tasks_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -460,7 +972,7 @@ type ReportResultRequest_Failure struct {
 
 func (x *ReportResultRequest_Failure) Reset() {
 	*x = ReportResultRequest_Failure{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	mi := &file_internal_proto_tasks_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -472,7 +984,7 @@ func (x *ReportResultRequest_Failure) String() string {
 func (*ReportResultRequest_Failure) ProtoMessage() {}
 
 func (x *ReportResultRequest_Failure) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	mi := &file_internal_proto_tasks_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -499,7 +1011,7 @@ var File_internal_proto_tasks_proto protoreflect.FileDescriptor
 
 const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\n" +
-	"\x1ainternal/proto/tasks.proto\x12\x10elpulpo.tasks.v1\"D\n" +
+	"\x1ainternal/proto/tasks.proto\x12\x10elpulpo.tasks.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"D\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -521,11 +1033,62 @@ const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\aFailure\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessageB\t\n" +
 	"\aoutcome\"\x16\n" +
-	"\x14ReportResultResponse2\x98\x02\n" +
+	"\x14ReportResultResponse\"\xbc\x05\n" +
+	"\n" +
+	"TaskDetail\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
+	"\apayload\x18\x03 \x01(\fR\apayload\x12\x1a\n" +
+	"\bpriority\x18\x04 \x01(\x05R\bpriority\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12?\n" +
+	"\rscheduled_for\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\fscheduledFor\x12#\n" +
+	"\rattempt_count\x18\a \x01(\x05R\fattemptCount\x12!\n" +
+	"\fmax_attempts\x18\b \x01(\x05R\vmaxAttempts\x12\x1d\n" +
+	"\n" +
+	"claimed_by\x18\t \x01(\tR\tclaimedBy\x129\n" +
+	"\n" +
+	"claimed_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tclaimedAt\x12F\n" +
+	"\x11last_heartbeat_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x0flastHeartbeatAt\x12=\n" +
+	"\fcompleted_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\r \x01(\tR\tlastError\x12\x19\n" +
+	"\bjira_url\x18\x0e \x01(\tR\ajiraUrl\x12\"\n" +
+	"\rgithub_pr_url\x18\x0f \x01(\tR\vgithubPrUrl\x129\n" +
+	"\n" +
+	"created_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x80\x02\n" +
+	"\x11CreateTaskRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\apayload\x18\x02 \x01(\fR\apayload\x12\x1a\n" +
+	"\bpriority\x18\x03 \x01(\x05R\bpriority\x12!\n" +
+	"\fmax_attempts\x18\x04 \x01(\x05R\vmaxAttempts\x12?\n" +
+	"\rscheduled_for\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\fscheduledFor\x12\x19\n" +
+	"\bjira_url\x18\x06 \x01(\tR\ajiraUrl\x12\"\n" +
+	"\rgithub_pr_url\x18\a \x01(\tR\vgithubPrUrl\"F\n" +
+	"\x12CreateTaskResponse\x120\n" +
+	"\x04task\x18\x01 \x01(\v2\x1c.elpulpo.tasks.v1.TaskDetailR\x04task\" \n" +
+	"\x0eGetTaskRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"C\n" +
+	"\x0fGetTaskResponse\x120\n" +
+	"\x04task\x18\x01 \x01(\v2\x1c.elpulpo.tasks.v1.TaskDetailR\x04task\"X\n" +
+	"\x10ListTasksRequest\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x03 \x01(\x05R\x06offset\"]\n" +
+	"\x11ListTasksResponse\x122\n" +
+	"\x05items\x18\x01 \x03(\v2\x1c.elpulpo.tasks.v1.TaskDetailR\x05items\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total2\x98\x02\n" +
 	"\vTaskService\x12T\n" +
 	"\tClaimTask\x12\".elpulpo.tasks.v1.ClaimTaskRequest\x1a#.elpulpo.tasks.v1.ClaimTaskResponse\x12T\n" +
 	"\tHeartbeat\x12\".elpulpo.tasks.v1.HeartbeatRequest\x1a#.elpulpo.tasks.v1.HeartbeatResponse\x12]\n" +
-	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponseB8Z6github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1b\x06proto3"
+	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponse2\x8d\x02\n" +
+	"\fAdminService\x12W\n" +
+	"\n" +
+	"CreateTask\x12#.elpulpo.tasks.v1.CreateTaskRequest\x1a$.elpulpo.tasks.v1.CreateTaskResponse\x12N\n" +
+	"\aGetTask\x12 .elpulpo.tasks.v1.GetTaskRequest\x1a!.elpulpo.tasks.v1.GetTaskResponse\x12T\n" +
+	"\tListTasks\x12\".elpulpo.tasks.v1.ListTasksRequest\x1a#.elpulpo.tasks.v1.ListTasksResponseB8Z6github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1b\x06proto3"
 
 var (
 	file_internal_proto_tasks_proto_rawDescOnce sync.Once
@@ -539,7 +1102,7 @@ func file_internal_proto_tasks_proto_rawDescGZIP() []byte {
 	return file_internal_proto_tasks_proto_rawDescData
 }
 
-var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_internal_proto_tasks_proto_goTypes = []any{
 	(*Task)(nil),                        // 0: elpulpo.tasks.v1.Task
 	(*ClaimTaskRequest)(nil),            // 1: elpulpo.tasks.v1.ClaimTaskRequest
@@ -548,24 +1111,48 @@ var file_internal_proto_tasks_proto_goTypes = []any{
 	(*HeartbeatResponse)(nil),           // 4: elpulpo.tasks.v1.HeartbeatResponse
 	(*ReportResultRequest)(nil),         // 5: elpulpo.tasks.v1.ReportResultRequest
 	(*ReportResultResponse)(nil),        // 6: elpulpo.tasks.v1.ReportResultResponse
-	(*ReportResultRequest_Success)(nil), // 7: elpulpo.tasks.v1.ReportResultRequest.Success
-	(*ReportResultRequest_Failure)(nil), // 8: elpulpo.tasks.v1.ReportResultRequest.Failure
+	(*TaskDetail)(nil),                  // 7: elpulpo.tasks.v1.TaskDetail
+	(*CreateTaskRequest)(nil),           // 8: elpulpo.tasks.v1.CreateTaskRequest
+	(*CreateTaskResponse)(nil),          // 9: elpulpo.tasks.v1.CreateTaskResponse
+	(*GetTaskRequest)(nil),              // 10: elpulpo.tasks.v1.GetTaskRequest
+	(*GetTaskResponse)(nil),             // 11: elpulpo.tasks.v1.GetTaskResponse
+	(*ListTasksRequest)(nil),            // 12: elpulpo.tasks.v1.ListTasksRequest
+	(*ListTasksResponse)(nil),           // 13: elpulpo.tasks.v1.ListTasksResponse
+	(*ReportResultRequest_Success)(nil), // 14: elpulpo.tasks.v1.ReportResultRequest.Success
+	(*ReportResultRequest_Failure)(nil), // 15: elpulpo.tasks.v1.ReportResultRequest.Failure
+	(*timestamppb.Timestamp)(nil),       // 16: google.protobuf.Timestamp
 }
 var file_internal_proto_tasks_proto_depIdxs = []int32{
-	0, // 0: elpulpo.tasks.v1.ClaimTaskResponse.task:type_name -> elpulpo.tasks.v1.Task
-	7, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
-	8, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
-	1, // 3: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
-	3, // 4: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
-	5, // 5: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
-	2, // 6: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
-	4, // 7: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
-	6, // 8: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
-	6, // [6:9] is the sub-list for method output_type
-	3, // [3:6] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0,  // 0: elpulpo.tasks.v1.ClaimTaskResponse.task:type_name -> elpulpo.tasks.v1.Task
+	14, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
+	15, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
+	16, // 3: elpulpo.tasks.v1.TaskDetail.scheduled_for:type_name -> google.protobuf.Timestamp
+	16, // 4: elpulpo.tasks.v1.TaskDetail.claimed_at:type_name -> google.protobuf.Timestamp
+	16, // 5: elpulpo.tasks.v1.TaskDetail.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	16, // 6: elpulpo.tasks.v1.TaskDetail.completed_at:type_name -> google.protobuf.Timestamp
+	16, // 7: elpulpo.tasks.v1.TaskDetail.created_at:type_name -> google.protobuf.Timestamp
+	16, // 8: elpulpo.tasks.v1.TaskDetail.updated_at:type_name -> google.protobuf.Timestamp
+	16, // 9: elpulpo.tasks.v1.CreateTaskRequest.scheduled_for:type_name -> google.protobuf.Timestamp
+	7,  // 10: elpulpo.tasks.v1.CreateTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
+	7,  // 11: elpulpo.tasks.v1.GetTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
+	7,  // 12: elpulpo.tasks.v1.ListTasksResponse.items:type_name -> elpulpo.tasks.v1.TaskDetail
+	1,  // 13: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
+	3,  // 14: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
+	5,  // 15: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
+	8,  // 16: elpulpo.tasks.v1.AdminService.CreateTask:input_type -> elpulpo.tasks.v1.CreateTaskRequest
+	10, // 17: elpulpo.tasks.v1.AdminService.GetTask:input_type -> elpulpo.tasks.v1.GetTaskRequest
+	12, // 18: elpulpo.tasks.v1.AdminService.ListTasks:input_type -> elpulpo.tasks.v1.ListTasksRequest
+	2,  // 19: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
+	4,  // 20: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
+	6,  // 21: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
+	9,  // 22: elpulpo.tasks.v1.AdminService.CreateTask:output_type -> elpulpo.tasks.v1.CreateTaskResponse
+	11, // 23: elpulpo.tasks.v1.AdminService.GetTask:output_type -> elpulpo.tasks.v1.GetTaskResponse
+	13, // 24: elpulpo.tasks.v1.AdminService.ListTasks:output_type -> elpulpo.tasks.v1.ListTasksResponse
+	19, // [19:25] is the sub-list for method output_type
+	13, // [13:19] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_internal_proto_tasks_proto_init() }
@@ -583,9 +1170,9 @@ func file_internal_proto_tasks_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_tasks_proto_rawDesc), len(file_internal_proto_tasks_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   16,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_internal_proto_tasks_proto_goTypes,
 		DependencyIndexes: file_internal_proto_tasks_proto_depIdxs,

@@ -4,7 +4,7 @@ DATABASE_URL ?= postgres://pulpo:pulpo@localhost:5432/pulpo?sslmode=disable
 MIGRATE      ?= go run -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate
 
 .PHONY: dev-up dev-down migrate-up migrate-down migrate-new \
-        proto run-mastermind run-worker test tidy build
+        proto run-mastermind run-worker run-mcp test tidy build build-mcp
 
 dev-up:
 	docker compose up -d
@@ -31,6 +31,7 @@ proto:
 run-mastermind:
 	DATABASE_URL=$(DATABASE_URL) \
 	WORKER_TOKEN=devtoken \
+	ADMIN_TOKEN=devtoken \
 	ADMIN_USER=admin ADMIN_PASSWORD=admin \
 	go run ./cmd/mastermind
 
@@ -38,6 +39,11 @@ run-worker:
 	MASTERMIND_ADDR=localhost:50051 \
 	WORKER_TOKEN=devtoken \
 	go run ./cmd/worker
+
+run-mcp:
+	MASTERMIND_ADDR=localhost:50051 \
+	ADMIN_TOKEN=devtoken \
+	go run ./cmd/mastermind-mcp
 
 test:
 	go test ./... -race -count=1
@@ -48,3 +54,7 @@ tidy:
 build:
 	CGO_ENABLED=0 go build -o bin/mastermind ./cmd/mastermind
 	CGO_ENABLED=0 go build -o bin/worker ./cmd/worker
+	CGO_ENABLED=0 go build -o bin/mastermind-mcp ./cmd/mastermind-mcp
+
+build-mcp:
+	CGO_ENABLED=0 go build -o bin/mastermind-mcp ./cmd/mastermind-mcp

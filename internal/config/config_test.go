@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -18,6 +19,7 @@ func TestLoadMastermind_Defaults(t *testing.T) {
 		"WORKER_TOKEN":   "tok",
 		"ADMIN_USER":     "admin",
 		"ADMIN_PASSWORD": "pw",
+		"ADMIN_TOKEN":    "tok",
 	})
 
 	cfg, err := LoadMastermind()
@@ -66,5 +68,38 @@ func TestLoadWorker_Defaults(t *testing.T) {
 	}
 	if cfg.HeartbeatInterval != 10*time.Second {
 		t.Errorf("HeartbeatInterval: got %v", cfg.HeartbeatInterval)
+	}
+}
+
+func TestLoadMastermind_AdminTokenRequired(t *testing.T) {
+	// Set every other required field; leave ADMIN_TOKEN unset.
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("WORKER_TOKEN", "w")
+	t.Setenv("ADMIN_USER", "u")
+	t.Setenv("ADMIN_PASSWORD", "p")
+	t.Setenv("ADMIN_TOKEN", "")
+
+	_, err := LoadMastermind()
+	if err == nil {
+		t.Fatal("want error for missing ADMIN_TOKEN, got nil")
+	}
+	if !strings.Contains(err.Error(), "ADMIN_TOKEN") {
+		t.Errorf("error %q should mention ADMIN_TOKEN", err.Error())
+	}
+}
+
+func TestLoadMastermind_AdminTokenPresent(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("WORKER_TOKEN", "w")
+	t.Setenv("ADMIN_USER", "u")
+	t.Setenv("ADMIN_PASSWORD", "p")
+	t.Setenv("ADMIN_TOKEN", "a")
+
+	cfg, err := LoadMastermind()
+	if err != nil {
+		t.Fatalf("LoadMastermind: %v", err)
+	}
+	if cfg.AdminToken != "a" {
+		t.Errorf("AdminToken=%q, want %q", cfg.AdminToken, "a")
 	}
 }

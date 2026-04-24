@@ -15,6 +15,7 @@ type Mastermind struct {
 	WorkerToken       string        `envconfig:"WORKER_TOKEN" required:"true"`
 	AdminUser         string        `envconfig:"ADMIN_USER" required:"true"`
 	AdminPassword     string        `envconfig:"ADMIN_PASSWORD" required:"true"`
+	AdminToken        string        `envconfig:"ADMIN_TOKEN" required:"true"`
 	VisibilityTimeout time.Duration `envconfig:"VISIBILITY_TIMEOUT" default:"30s"`
 	ReaperInterval    time.Duration `envconfig:"REAPER_INTERVAL" default:"10s"`
 	LogLevel          string        `envconfig:"LOG_LEVEL" default:"info"`
@@ -46,6 +47,9 @@ func LoadMastermind() (Mastermind, error) {
 	}
 	if c.AdminPassword == "" {
 		return c, fmt.Errorf("required key ADMIN_PASSWORD missing value")
+	}
+	if c.AdminToken == "" {
+		return c, fmt.Errorf("required key ADMIN_TOKEN missing value")
 	}
 	return c, nil
 }
