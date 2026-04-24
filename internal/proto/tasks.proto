@@ -140,9 +140,9 @@ message TaskLogEntry {
 }
 
 // AdminService is the administrative surface of mastermind. It is consumed by
-// the mastermind-mcp binary (on behalf of a coding agent) and any future admin
-// tooling. Authentication uses ADMIN_TOKEN, enforced by the server's
-// per-method bearer interceptor.
+// the mastermind-mcp binary (on behalf of a coding agent), the elpulpo CLI,
+// and any future admin tooling. Authentication uses ADMIN_TOKEN, enforced by
+// the server's per-method bearer interceptor.
 service AdminService {
   // CreateTask inserts a new task in `pending` state and returns it.
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
@@ -156,6 +156,24 @@ service AdminService {
   // ListTaskLogs returns the append-only log lines recorded for a task
   // (oldest first, capped by `limit`). NOT_FOUND when the id is unknown.
   rpc ListTaskLogs(ListTaskLogsRequest) returns (ListTaskLogsResponse);
+
+  // CancelTask removes a task. Only allowed when the task is pending,
+  // completed, or failed; returns FAILED_PRECONDITION while it is active
+  // (claimed or running) because an operator cannot safely unilaterally
+  // abandon work that a worker still holds. NOT_FOUND when id is unknown.
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+
+  // RetryTask resets a task back to `pending` with attempt_count=0, clearing
+  // claim state and any previous failure. Allowed from pending, completed,
+  // or failed. Returns FAILED_PRECONDITION while the task is claimed or
+  // running.
+  rpc RetryTask(RetryTaskRequest) returns (RetryTaskResponse);
+
+  // ListWorkers returns the distinct worker identities mastermind has seen
+  // claim work, alongside lightweight status per worker (how many tasks they
+  // currently hold and when they last sent a heartbeat). Derived purely from
+  // the tasks table — mastermind does not maintain a separate workers table.
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
 }
 
 // TaskDetail mirrors the mastermind `tasks` row. Nullable columns become empty
@@ -212,4 +230,39 @@ message ListTaskLogsRequest {
 
 message ListTaskLogsResponse {
   repeated TaskLogEntry items = 1;
+}
+
+message CancelTaskRequest  { string id = 1; }
+message CancelTaskResponse {}
+
+message RetryTaskRequest  { string id = 1; }
+message RetryTaskResponse { TaskDetail task = 1; }
+
+// WorkerInfo describes one distinct worker identity that has at some point
+// claimed a task. All fields are derived from aggregations over the tasks
+// table: mastermind does not persist a separate worker registry.
+message WorkerInfo {
+  // claimed_by value used by this worker.
+  string id = 1;
+
+  // Number of tasks currently in `claimed` or `running` state that are
+  // owned by this worker.
+  int32 active_tasks = 2;
+
+  // Most recent heartbeat (or claim time, if the worker never heartbeated)
+  // across any task this worker has owned. Zero when the worker is only
+  // known from historical, already-completed tasks.
+  google.protobuf.Timestamp last_seen_at = 3;
+
+  // Lifetime count of tasks this worker has completed successfully.
+  int32 completed_tasks = 4;
+
+  // Lifetime count of tasks this worker claimed that ended in `failed`.
+  int32 failed_tasks = 5;
+}
+
+message ListWorkersRequest {}
+
+message ListWorkersResponse {
+  repeated WorkerInfo items = 1;
 }

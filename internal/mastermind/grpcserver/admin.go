@@ -168,6 +168,62 @@ func (a *AdminServer) ListTaskLogs(ctx context.Context, req *pb.ListTaskLogsRequ
 	return out, nil
 }
 
+func (a *AdminServer) CancelTask(ctx context.Context, req *pb.CancelTaskRequest) (*pb.CancelTaskResponse, error) {
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "id must be a UUID")
+	}
+	switch err := a.store.DeleteTask(ctx, id); {
+	case err == nil:
+		return &pb.CancelTaskResponse{}, nil
+	case errors.Is(err, store.ErrNotFound):
+		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
+	case errors.Is(err, store.ErrNotDeletable):
+		return nil, status.Error(codes.FailedPrecondition, "cannot cancel an active task (claimed or running)")
+	default:
+		return nil, status.Errorf(codes.Internal, "cancel: %v", err)
+	}
+}
+
+func (a *AdminServer) RetryTask(ctx context.Context, req *pb.RetryTaskRequest) (*pb.RetryTaskResponse, error) {
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "id must be a UUID")
+	}
+	t, err := a.store.RequeueTask(ctx, id)
+	switch {
+	case err == nil:
+		return &pb.RetryTaskResponse{Task: toTaskDetail(t)}, nil
+	case errors.Is(err, store.ErrNotFound):
+		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
+	case errors.Is(err, store.ErrNotRequeueable):
+		return nil, status.Error(codes.FailedPrecondition, "cannot retry an active task (claimed or running)")
+	default:
+		return nil, status.Errorf(codes.Internal, "retry: %v", err)
+	}
+}
+
+func (a *AdminServer) ListWorkers(ctx context.Context, _ *pb.ListWorkersRequest) (*pb.ListWorkersResponse, error) {
+	workers, err := a.store.ListWorkers(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "list_workers: %v", err)
+	}
+	out := &pb.ListWorkersResponse{}
+	for _, w := range workers {
+		info := &pb.WorkerInfo{
+			Id:             w.ID,
+			ActiveTasks:    int32(w.ActiveTasks),
+			CompletedTasks: int32(w.CompletedTasks),
+			FailedTasks:    int32(w.FailedTasks),
+		}
+		if w.LastSeenAt != nil {
+			info.LastSeenAt = timestamppb.New(*w.LastSeenAt)
+		}
+		out.Items = append(out.Items, info)
+	}
+	return out, nil
+}
+
 func (a *AdminServer) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.ListTasksResponse, error) {
 	f := store.ListTasksFilter{
 		Limit:  int(req.GetLimit()),

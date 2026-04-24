@@ -329,6 +329,9 @@ const (
 	AdminService_GetTask_FullMethodName      = "/elpulpo.tasks.v1.AdminService/GetTask"
 	AdminService_ListTasks_FullMethodName    = "/elpulpo.tasks.v1.AdminService/ListTasks"
 	AdminService_ListTaskLogs_FullMethodName = "/elpulpo.tasks.v1.AdminService/ListTaskLogs"
+	AdminService_CancelTask_FullMethodName   = "/elpulpo.tasks.v1.AdminService/CancelTask"
+	AdminService_RetryTask_FullMethodName    = "/elpulpo.tasks.v1.AdminService/RetryTask"
+	AdminService_ListWorkers_FullMethodName  = "/elpulpo.tasks.v1.AdminService/ListWorkers"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -336,9 +339,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // AdminService is the administrative surface of mastermind. It is consumed by
-// the mastermind-mcp binary (on behalf of a coding agent) and any future admin
-// tooling. Authentication uses ADMIN_TOKEN, enforced by the server's
-// per-method bearer interceptor.
+// the mastermind-mcp binary (on behalf of a coding agent), the elpulpo CLI,
+// and any future admin tooling. Authentication uses ADMIN_TOKEN, enforced by
+// the server's per-method bearer interceptor.
 type AdminServiceClient interface {
 	// CreateTask inserts a new task in `pending` state and returns it.
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
@@ -349,6 +352,21 @@ type AdminServiceClient interface {
 	// ListTaskLogs returns the append-only log lines recorded for a task
 	// (oldest first, capped by `limit`). NOT_FOUND when the id is unknown.
 	ListTaskLogs(ctx context.Context, in *ListTaskLogsRequest, opts ...grpc.CallOption) (*ListTaskLogsResponse, error)
+	// CancelTask removes a task. Only allowed when the task is pending,
+	// completed, or failed; returns FAILED_PRECONDITION while it is active
+	// (claimed or running) because an operator cannot safely unilaterally
+	// abandon work that a worker still holds. NOT_FOUND when id is unknown.
+	CancelTask(ctx context.Context, in *CancelTaskRequest, opts ...grpc.CallOption) (*CancelTaskResponse, error)
+	// RetryTask resets a task back to `pending` with attempt_count=0, clearing
+	// claim state and any previous failure. Allowed from pending, completed,
+	// or failed. Returns FAILED_PRECONDITION while the task is claimed or
+	// running.
+	RetryTask(ctx context.Context, in *RetryTaskRequest, opts ...grpc.CallOption) (*RetryTaskResponse, error)
+	// ListWorkers returns the distinct worker identities mastermind has seen
+	// claim work, alongside lightweight status per worker (how many tasks they
+	// currently hold and when they last sent a heartbeat). Derived purely from
+	// the tasks table — mastermind does not maintain a separate workers table.
+	ListWorkers(ctx context.Context, in *ListWorkersRequest, opts ...grpc.CallOption) (*ListWorkersResponse, error)
 }
 
 type adminServiceClient struct {
@@ -399,14 +417,44 @@ func (c *adminServiceClient) ListTaskLogs(ctx context.Context, in *ListTaskLogsR
 	return out, nil
 }
 
+func (c *adminServiceClient) CancelTask(ctx context.Context, in *CancelTaskRequest, opts ...grpc.CallOption) (*CancelTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelTaskResponse)
+	err := c.cc.Invoke(ctx, AdminService_CancelTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) RetryTask(ctx context.Context, in *RetryTaskRequest, opts ...grpc.CallOption) (*RetryTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RetryTaskResponse)
+	err := c.cc.Invoke(ctx, AdminService_RetryTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) ListWorkers(ctx context.Context, in *ListWorkersRequest, opts ...grpc.CallOption) (*ListWorkersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorkersResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListWorkers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AdminServiceServer is the server API for AdminService service.
 // All implementations must embed UnimplementedAdminServiceServer
 // for forward compatibility.
 //
 // AdminService is the administrative surface of mastermind. It is consumed by
-// the mastermind-mcp binary (on behalf of a coding agent) and any future admin
-// tooling. Authentication uses ADMIN_TOKEN, enforced by the server's
-// per-method bearer interceptor.
+// the mastermind-mcp binary (on behalf of a coding agent), the elpulpo CLI,
+// and any future admin tooling. Authentication uses ADMIN_TOKEN, enforced by
+// the server's per-method bearer interceptor.
 type AdminServiceServer interface {
 	// CreateTask inserts a new task in `pending` state and returns it.
 	CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
@@ -417,6 +465,21 @@ type AdminServiceServer interface {
 	// ListTaskLogs returns the append-only log lines recorded for a task
 	// (oldest first, capped by `limit`). NOT_FOUND when the id is unknown.
 	ListTaskLogs(context.Context, *ListTaskLogsRequest) (*ListTaskLogsResponse, error)
+	// CancelTask removes a task. Only allowed when the task is pending,
+	// completed, or failed; returns FAILED_PRECONDITION while it is active
+	// (claimed or running) because an operator cannot safely unilaterally
+	// abandon work that a worker still holds. NOT_FOUND when id is unknown.
+	CancelTask(context.Context, *CancelTaskRequest) (*CancelTaskResponse, error)
+	// RetryTask resets a task back to `pending` with attempt_count=0, clearing
+	// claim state and any previous failure. Allowed from pending, completed,
+	// or failed. Returns FAILED_PRECONDITION while the task is claimed or
+	// running.
+	RetryTask(context.Context, *RetryTaskRequest) (*RetryTaskResponse, error)
+	// ListWorkers returns the distinct worker identities mastermind has seen
+	// claim work, alongside lightweight status per worker (how many tasks they
+	// currently hold and when they last sent a heartbeat). Derived purely from
+	// the tasks table — mastermind does not maintain a separate workers table.
+	ListWorkers(context.Context, *ListWorkersRequest) (*ListWorkersResponse, error)
 	mustEmbedUnimplementedAdminServiceServer()
 }
 
@@ -438,6 +501,15 @@ func (UnimplementedAdminServiceServer) ListTasks(context.Context, *ListTasksRequ
 }
 func (UnimplementedAdminServiceServer) ListTaskLogs(context.Context, *ListTaskLogsRequest) (*ListTaskLogsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTaskLogs not implemented")
+}
+func (UnimplementedAdminServiceServer) CancelTask(context.Context, *CancelTaskRequest) (*CancelTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelTask not implemented")
+}
+func (UnimplementedAdminServiceServer) RetryTask(context.Context, *RetryTaskRequest) (*RetryTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RetryTask not implemented")
+}
+func (UnimplementedAdminServiceServer) ListWorkers(context.Context, *ListWorkersRequest) (*ListWorkersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWorkers not implemented")
 }
 func (UnimplementedAdminServiceServer) mustEmbedUnimplementedAdminServiceServer() {}
 func (UnimplementedAdminServiceServer) testEmbeddedByValue()                      {}
@@ -532,6 +604,60 @@ func _AdminService_ListTaskLogs_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_CancelTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).CancelTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_CancelTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).CancelTask(ctx, req.(*CancelTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_RetryTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RetryTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).RetryTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_RetryTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).RetryTask(ctx, req.(*RetryTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_ListWorkers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorkersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListWorkers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListWorkers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListWorkers(ctx, req.(*ListWorkersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -554,6 +680,18 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTaskLogs",
 			Handler:    _AdminService_ListTaskLogs_Handler,
+		},
+		{
+			MethodName: "CancelTask",
+			Handler:    _AdminService_CancelTask_Handler,
+		},
+		{
+			MethodName: "RetryTask",
+			Handler:    _AdminService_RetryTask_Handler,
+		},
+		{
+			MethodName: "ListWorkers",
+			Handler:    _AdminService_ListWorkers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

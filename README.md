@@ -106,6 +106,39 @@ Tools: `create_task`, `get_task`, `list_tasks`. See the design doc for the full 
 
 Keep `ADMIN_TOKEN` out of version control — source it from your shell environment or a secrets manager. Set `MASTERMIND_TLS=true` when mastermind is not on localhost; otherwise the bearer token is sent in cleartext.
 
+## `elpulpo` CLI
+
+`elpulpo` is a single Go binary that wraps the mastermind admin gRPC surface
+so operators can do ad-hoc queue operations from a shell without curling the
+HTMX admin UI. It uses the same bearer-token environment as `mastermind-mcp`
+(`MASTERMIND_ADDR`, `ADMIN_TOKEN`, `MASTERMIND_TLS`), so one `.env` serves
+both.
+
+Build and run:
+
+```bash
+make build-cli                   # -> bin/elpulpo
+bin/elpulpo help                 # full usage reference
+
+# convenience: pass positional args through Make
+make run-cli ARGS="tasks list"
+```
+
+Commands:
+
+| Command | Purpose |
+| ------- | ------- |
+| `elpulpo tasks create --name NAME [flags]` | Enqueue a new task. `--payload` accepts inline JSON, `@path` for a file, or `-` for stdin. |
+| `elpulpo tasks get <id>` | Show one task's full state. |
+| `elpulpo tasks list [flags]` | Table of tasks; filter with `--status`, paginate with `--limit`/`--offset`, emit JSON with `--json`. |
+| `elpulpo tasks cancel <id>` | Remove a task. Rejects tasks that are currently claimed or running. |
+| `elpulpo tasks retry <id>` | Reset a pending/completed/failed task back to `pending` with a fresh attempt count. |
+| `elpulpo workers list` | Distinct worker identities seen in the tasks table with active / completed / failed counts and last-seen timestamp. |
+
+Set `MASTERMIND_TLS=true` when mastermind is not on localhost; otherwise the
+bearer token is sent in cleartext. `REQUEST_TIMEOUT` (default `15s`) caps any
+single RPC.
+
 ## Metrics / Health
 
 - `GET /metrics`  — Prometheus scrape target
