@@ -6,6 +6,7 @@
 <p><strong>Attempts:</strong> {{ .Task.AttemptCount }} / {{ .Task.MaxAttempts }}</p>
 <p><strong>Claimed by:</strong> {{ if .Task.ClaimedBy }}{{ .Task.ClaimedBy }}{{ else }}—{{ end }}</p>
 <p><strong>Last heartbeat:</strong> {{ if .Task.LastHeartbeatAt }}{{ .Task.LastHeartbeatAt }}{{ else }}—{{ end }}</p>
+<p><strong>Progress:</strong> {{ if .Task.ProgressNote }}{{ deref .Task.ProgressNote }}{{ else }}—{{ end }}</p>
 <p><strong>Last error:</strong> {{ if .Task.LastError }}<code>{{ .Task.LastError }}</code>{{ else }}—{{ end }}</p>
 <p>
   <strong>JIRA:</strong>

@@ -278,3 +278,30 @@ func TestDetailPage_ShowsRefsAndUpdateForm(t *testing.T) {
 		t.Errorf("detail missing link-update form: %s", body)
 	}
 }
+
+func TestDetailPage_ShowsProgressNote(t *testing.T) {
+	srv := newServer(t)
+	s, _ := store.Open(context.Background(), testDSN)
+	defer s.Close()
+
+	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{Name: "detail", MaxAttempts: 3})
+	if _, err := s.Pool().Exec(context.Background(),
+		`UPDATE tasks SET status='running', claimed_by='w1', progress_note='step 2/3' WHERE id=$1`,
+		task.ID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodGet, "/tasks/"+task.ID.String(), ""))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("code=%d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "Progress:") {
+		t.Errorf("detail missing Progress row: %s", body)
+	}
+	if !strings.Contains(body, "step 2/3") {
+		t.Errorf("detail missing progress_note value: %s", body)
+	}
+}
