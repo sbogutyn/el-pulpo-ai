@@ -31,6 +31,7 @@ proto:
 run-mastermind:
 	DATABASE_URL=$(DATABASE_URL) \
 	WORKER_TOKEN=devtoken \
+	ADMIN_TOKEN=devtoken \
 	ADMIN_USER=admin ADMIN_PASSWORD=admin \
 	go run ./cmd/mastermind
 
