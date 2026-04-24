@@ -126,3 +126,40 @@ func (a *AdminServer) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.
 	}
 	return &pb.GetTaskResponse{Task: toTaskDetail(t)}, nil
 }
+
+var knownStatuses = map[string]store.TaskStatus{
+	"pending":   store.StatusPending,
+	"claimed":   store.StatusClaimed,
+	"running":   store.StatusRunning,
+	"completed": store.StatusCompleted,
+	"failed":    store.StatusFailed,
+}
+
+func (a *AdminServer) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.ListTasksResponse, error) {
+	f := store.ListTasksFilter{
+		Limit:  int(req.GetLimit()),
+		Offset: int(req.GetOffset()),
+	}
+	if req.GetLimit() < 0 || req.GetLimit() > 500 {
+		return nil, status.Error(codes.InvalidArgument, "limit must be 0..500")
+	}
+	if req.GetOffset() < 0 {
+		return nil, status.Error(codes.InvalidArgument, "offset must be non-negative")
+	}
+	if s := req.GetStatus(); s != "" {
+		ks, ok := knownStatuses[s]
+		if !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "unknown status %q", s)
+		}
+		f.Status = &ks
+	}
+	page, err := a.store.ListTasks(ctx, f)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "list: %v", err)
+	}
+	out := &pb.ListTasksResponse{Total: int32(page.Total)}
+	for _, t := range page.Items {
+		out.Items = append(out.Items, toTaskDetail(t))
+	}
+	return out, nil
+}

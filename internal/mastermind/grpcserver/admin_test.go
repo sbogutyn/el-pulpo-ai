@@ -190,3 +190,72 @@ func TestGetTask_NotFound(t *testing.T) {
 		t.Errorf("code=%v, want NotFound", status.Code(err))
 	}
 }
+
+func TestListTasks_EmptyFilter(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	for i := 0; i < 3; i++ {
+		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resp, err := admin.ListTasks(adminCtx(), &pb.ListTasksRequest{})
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if resp.Total != 3 {
+		t.Errorf("Total=%d, want 3", resp.Total)
+	}
+	if len(resp.Items) != 3 {
+		t.Errorf("len(Items)=%d, want 3", len(resp.Items))
+	}
+}
+
+func TestListTasks_StatusFilter(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	for i := 0; i < 2; i++ {
+		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resp, err := admin.ListTasks(adminCtx(), &pb.ListTasksRequest{Status: "pending"})
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if resp.Total != 2 {
+		t.Errorf("Total=%d, want 2", resp.Total)
+	}
+	resp, err = admin.ListTasks(adminCtx(), &pb.ListTasksRequest{Status: "completed"})
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if resp.Total != 0 {
+		t.Errorf("Total=%d, want 0", resp.Total)
+	}
+}
+
+func TestListTasks_BadStatus(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	_, err := admin.ListTasks(adminCtx(), &pb.ListTasksRequest{Status: "nope"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestListTasks_Pagination(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	for i := 0; i < 5; i++ {
+		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resp, err := admin.ListTasks(adminCtx(), &pb.ListTasksRequest{Limit: 2, Offset: 1})
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if resp.Total != 5 {
+		t.Errorf("Total=%d, want 5", resp.Total)
+	}
+	if len(resp.Items) != 2 {
+		t.Errorf("len(Items)=%d, want 2", len(resp.Items))
+	}
+}
