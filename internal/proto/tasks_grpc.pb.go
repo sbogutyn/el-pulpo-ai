@@ -227,3 +227,197 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "internal/proto/tasks.proto",
 }
+
+const (
+	AdminService_CreateTask_FullMethodName = "/elpulpo.tasks.v1.AdminService/CreateTask"
+	AdminService_GetTask_FullMethodName    = "/elpulpo.tasks.v1.AdminService/GetTask"
+	AdminService_ListTasks_FullMethodName  = "/elpulpo.tasks.v1.AdminService/ListTasks"
+)
+
+// AdminServiceClient is the client API for AdminService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// AdminService is the administrative surface of mastermind. It is consumed by
+// the mastermind-mcp binary (on behalf of a coding agent) and any future admin
+// tooling. Authentication uses ADMIN_TOKEN, enforced by the server's
+// per-method bearer interceptor.
+type AdminServiceClient interface {
+	// CreateTask inserts a new task in `pending` state and returns it.
+	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
+	// GetTask returns one task by id. NOT_FOUND when the id is unknown.
+	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
+	// ListTasks returns a page of tasks, optionally filtered by status.
+	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+}
+
+type adminServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAdminServiceClient(cc grpc.ClientConnInterface) AdminServiceClient {
+	return &adminServiceClient{cc}
+}
+
+func (c *adminServiceClient) CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateTaskResponse)
+	err := c.cc.Invoke(ctx, AdminService_CreateTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskResponse)
+	err := c.cc.Invoke(ctx, AdminService_GetTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTasksResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AdminServiceServer is the server API for AdminService service.
+// All implementations must embed UnimplementedAdminServiceServer
+// for forward compatibility.
+//
+// AdminService is the administrative surface of mastermind. It is consumed by
+// the mastermind-mcp binary (on behalf of a coding agent) and any future admin
+// tooling. Authentication uses ADMIN_TOKEN, enforced by the server's
+// per-method bearer interceptor.
+type AdminServiceServer interface {
+	// CreateTask inserts a new task in `pending` state and returns it.
+	CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
+	// GetTask returns one task by id. NOT_FOUND when the id is unknown.
+	GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error)
+	// ListTasks returns a page of tasks, optionally filtered by status.
+	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	mustEmbedUnimplementedAdminServiceServer()
+}
+
+// UnimplementedAdminServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAdminServiceServer struct{}
+
+func (UnimplementedAdminServiceServer) CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateTask not implemented")
+}
+func (UnimplementedAdminServiceServer) GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTask not implemented")
+}
+func (UnimplementedAdminServiceServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTasks not implemented")
+}
+func (UnimplementedAdminServiceServer) mustEmbedUnimplementedAdminServiceServer() {}
+func (UnimplementedAdminServiceServer) testEmbeddedByValue()                      {}
+
+// UnsafeAdminServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AdminServiceServer will
+// result in compilation errors.
+type UnsafeAdminServiceServer interface {
+	mustEmbedUnimplementedAdminServiceServer()
+}
+
+func RegisterAdminServiceServer(s grpc.ServiceRegistrar, srv AdminServiceServer) {
+	// If the following call panics, it indicates UnimplementedAdminServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AdminService_ServiceDesc, srv)
+}
+
+func _AdminService_CreateTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).CreateTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_CreateTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).CreateTask(ctx, req.(*CreateTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_GetTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).GetTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_GetTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).GetTask(ctx, req.(*GetTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_ListTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListTasks(ctx, req.(*ListTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AdminService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "elpulpo.tasks.v1.AdminService",
+	HandlerType: (*AdminServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateTask",
+			Handler:    _AdminService_CreateTask_Handler,
+		},
+		{
+			MethodName: "GetTask",
+			Handler:    _AdminService_GetTask_Handler,
+		},
+		{
+			MethodName: "ListTasks",
+			Handler:    _AdminService_ListTasks_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "internal/proto/tasks.proto",
+}

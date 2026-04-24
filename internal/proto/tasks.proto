@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package elpulpo.tasks.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1";
 
 // TaskService is the wire contract between the mastermind server and worker
@@ -91,3 +93,65 @@ message ReportResultRequest {
 }
 
 message ReportResultResponse {}
+
+// AdminService is the administrative surface of mastermind. It is consumed by
+// the mastermind-mcp binary (on behalf of a coding agent) and any future admin
+// tooling. Authentication uses ADMIN_TOKEN, enforced by the server's
+// per-method bearer interceptor.
+service AdminService {
+  // CreateTask inserts a new task in `pending` state and returns it.
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+
+  // GetTask returns one task by id. NOT_FOUND when the id is unknown.
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+
+  // ListTasks returns a page of tasks, optionally filtered by status.
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+}
+
+// TaskDetail mirrors the mastermind `tasks` row. Nullable columns become empty
+// strings or zero timestamps on the wire; the MCP adapter omits them when
+// serializing to JSON.
+message TaskDetail {
+  string id                                      = 1;
+  string name                                    = 2;
+  bytes  payload                                 = 3;
+  int32  priority                                = 4;
+  string status                                  = 5;
+  google.protobuf.Timestamp scheduled_for        = 6;
+  int32  attempt_count                           = 7;
+  int32  max_attempts                            = 8;
+  string claimed_by                              = 9;
+  google.protobuf.Timestamp claimed_at           = 10;
+  google.protobuf.Timestamp last_heartbeat_at    = 11;
+  google.protobuf.Timestamp completed_at         = 12;
+  string last_error                              = 13;
+  string jira_url                                = 14;
+  string github_pr_url                           = 15;
+  google.protobuf.Timestamp created_at           = 16;
+  google.protobuf.Timestamp updated_at           = 17;
+}
+
+message CreateTaskRequest {
+  string name                                    = 1;
+  bytes  payload                                 = 2;
+  int32  priority                                = 3;
+  int32  max_attempts                            = 4;
+  google.protobuf.Timestamp scheduled_for        = 5;
+  string jira_url                                = 6;
+  string github_pr_url                           = 7;
+}
+message CreateTaskResponse { TaskDetail task = 1; }
+
+message GetTaskRequest  { string id = 1; }
+message GetTaskResponse { TaskDetail task = 1; }
+
+message ListTasksRequest {
+  string status = 1;
+  int32  limit  = 2;
+  int32  offset = 3;
+}
+message ListTasksResponse {
+  repeated TaskDetail items = 1;
+  int32             total   = 2;
+}
