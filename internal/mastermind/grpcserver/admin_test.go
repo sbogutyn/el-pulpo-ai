@@ -31,17 +31,20 @@ func startAdminBufServer(t *testing.T) (pb.AdminServiceClient, pb.TaskServiceCli
 		t.Fatalf("store.Open: %v", err)
 	}
 	t.Cleanup(s.Close)
-	if _, err := s.Pool().Exec(context.Background(), "TRUNCATE TABLE tasks"); err != nil {
+	if _, err := s.Pool().Exec(context.Background(), "TRUNCATE TABLE tasks CASCADE"); err != nil {
 		t.Fatal(err)
 	}
 
 	policy := map[string]string{
-		"/elpulpo.tasks.v1.TaskService/ClaimTask":    testWorkerToken,
-		"/elpulpo.tasks.v1.TaskService/Heartbeat":    testWorkerToken,
-		"/elpulpo.tasks.v1.TaskService/ReportResult": testWorkerToken,
-		"/elpulpo.tasks.v1.AdminService/CreateTask":  testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/GetTask":     testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/ListTasks":   testAdminToken,
+		"/elpulpo.tasks.v1.TaskService/ClaimTask":      testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/Heartbeat":      testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/ReportResult":   testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/UpdateProgress": testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/AppendLog":      testWorkerToken,
+		"/elpulpo.tasks.v1.AdminService/CreateTask":    testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/GetTask":       testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListTasks":     testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListTaskLogs":  testAdminToken,
 	}
 
 	lis := bufconn.Listen(1 << 20)
@@ -238,6 +241,43 @@ func TestListTasks_BadStatus(t *testing.T) {
 	_, err := admin.ListTasks(adminCtx(), &pb.ListTasksRequest{Status: "nope"})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestListTaskLogs_Happy(t *testing.T) {
+	admin, tasks, _ := startAdminBufServer(t)
+	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claim, err := tasks.ClaimTask(workerCtx(), &pb.ClaimTaskRequest{WorkerId: "w1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, msg := range []string{"a", "b", "c"} {
+		if _, err := tasks.AppendLog(workerCtx(), &pb.AppendLogRequest{
+			WorkerId: "w1", TaskId: claim.GetTask().GetId(), Message: msg,
+		}); err != nil {
+			t.Fatalf("AppendLog %q: %v", msg, err)
+		}
+	}
+	resp, err := admin.ListTaskLogs(adminCtx(), &pb.ListTaskLogsRequest{Id: created.Task.Id})
+	if err != nil {
+		t.Fatalf("ListTaskLogs: %v", err)
+	}
+	if len(resp.Items) != 3 {
+		t.Fatalf("items=%d, want 3", len(resp.Items))
+	}
+	if resp.Items[0].Message != "a" || resp.Items[2].Message != "c" {
+		t.Errorf("ordering wrong: %v", resp.Items)
+	}
+}
+
+func TestListTaskLogs_UnknownTask(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	_, err := admin.ListTaskLogs(adminCtx(), &pb.ListTaskLogsRequest{Id: "00000000-0000-0000-0000-000000000000"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("code=%v, want NotFound", status.Code(err))
 	}
 }
 

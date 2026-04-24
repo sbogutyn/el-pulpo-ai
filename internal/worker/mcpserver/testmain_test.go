@@ -2,16 +2,19 @@ package mcpserver
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -23,9 +26,10 @@ import (
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/grpcserver"
 	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 	pb "github.com/sbogutyn/el-pulpo-ai/internal/proto"
+	"github.com/sbogutyn/el-pulpo-ai/internal/worker/taskclient"
 )
 
-const testAdminToken = "admin-tok"
+const testWorkerToken = "worker-tok"
 
 var testDSN string
 
@@ -48,7 +52,7 @@ func TestMain(m *testing.M) {
 	testDSN = dsn
 
 	_, thisFile, _, _ := runtime.Caller(0)
-	migrationsDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "migrations")
+	migrationsDir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "migrations")
 	mg, err := migrate.New("file://"+migrationsDir, dsn)
 	if err != nil {
 		panic(err)
@@ -61,10 +65,20 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// startAdminBuf creates a fresh store, truncates tasks, and returns an
-// AdminServiceClient connected to a bufconn-served AdminService guarded by
-// the per-method auth policy.
-func startAdminBuf(t *testing.T) (pb.AdminServiceClient, *store.Store) {
+// workerFixture wires a fresh store, a bufconn-served TaskService with the
+// worker auth policy, a taskclient bound to a random worker id, and a State.
+type workerFixture struct {
+	store    *store.Store
+	client   *taskclient.Client
+	state    *State
+	workerID string
+
+	srv    *grpc.Server
+	wg     sync.WaitGroup
+	closed bool
+}
+
+func newWorkerFixture(t *testing.T) *workerFixture {
 	t.Helper()
 	s, err := store.Open(context.Background(), testDSN)
 	if err != nil {
@@ -76,26 +90,42 @@ func startAdminBuf(t *testing.T) (pb.AdminServiceClient, *store.Store) {
 	}
 
 	policy := map[string]string{
-		"/elpulpo.tasks.v1.AdminService/CreateTask": testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/GetTask":    testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/ListTasks":  testAdminToken,
+		"/elpulpo.tasks.v1.TaskService/ClaimTask":      testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/Heartbeat":      testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/ReportResult":   testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/UpdateProgress": testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/AppendLog":      testWorkerToken,
 	}
 
 	lis := bufconn.Listen(1 << 20)
 	srv := grpc.NewServer(grpc.UnaryInterceptor(auth.PerMethodInterceptor(policy)))
-	pb.RegisterAdminServiceServer(srv, grpcserver.NewAdmin(s))
-	go func() { _ = srv.Serve(lis) }()
-	t.Cleanup(srv.Stop)
+	pb.RegisterTaskServiceServer(srv, grpcserver.New(s))
+
+	fx := &workerFixture{store: s, srv: srv}
+	fx.wg.Go(func() {
+		_ = srv.Serve(lis)
+	})
+	t.Cleanup(func() {
+		if !fx.closed {
+			srv.Stop()
+			fx.wg.Wait()
+		}
+	})
 
 	dialer := func(context.Context, string) (net.Conn, error) { return lis.Dial() }
 	conn, err := grpc.NewClient("passthrough:///bufnet",
 		grpc.WithContextDialer(dialer),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithPerRPCCredentials(auth.BearerCredentials(testAdminToken)))
+		grpc.WithPerRPCCredentials(auth.BearerCredentials(testWorkerToken)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
 
-	return pb.NewAdminServiceClient(conn), s
+	fx.workerID = uuid.New().String()
+	fx.client = taskclient.NewClient(pb.NewTaskServiceClient(conn), fx.workerID)
+	// Heartbeat generously so tests don't see spurious renewals.
+	fx.state = New(fx.client, 5*time.Second, slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	t.Cleanup(fx.state.Release)
+	return fx
 }

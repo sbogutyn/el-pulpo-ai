@@ -69,6 +69,24 @@ func TestLoadWorker_Defaults(t *testing.T) {
 	if cfg.HeartbeatInterval != 10*time.Second {
 		t.Errorf("HeartbeatInterval: got %v", cfg.HeartbeatInterval)
 	}
+	if cfg.MCPListenAddr != "127.0.0.1:7777" {
+		t.Errorf("MCPListenAddr: got %q, want 127.0.0.1:7777", cfg.MCPListenAddr)
+	}
+}
+
+func TestLoadWorker_MCPListenAddrOverride(t *testing.T) {
+	setEnv(t, map[string]string{
+		"MASTERMIND_ADDR":        "mastermind:50051",
+		"WORKER_TOKEN":           "tok",
+		"WORKER_MCP_LISTEN_ADDR": "127.0.0.1:9100",
+	})
+	cfg, err := LoadWorker()
+	if err != nil {
+		t.Fatalf("LoadWorker: %v", err)
+	}
+	if cfg.MCPListenAddr != "127.0.0.1:9100" {
+		t.Errorf("MCPListenAddr: got %q, want 127.0.0.1:9100", cfg.MCPListenAddr)
+	}
 }
 
 func TestLoadMastermind_AdminTokenRequired(t *testing.T) {

@@ -135,6 +135,39 @@ var knownStatuses = map[string]store.TaskStatus{
 	"failed":    store.StatusFailed,
 }
 
+func (a *AdminServer) ListTaskLogs(ctx context.Context, req *pb.ListTaskLogsRequest) (*pb.ListTaskLogsResponse, error) {
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "id must be a UUID")
+	}
+	if req.GetLimit() < 0 || req.GetLimit() > 10000 {
+		return nil, status.Error(codes.InvalidArgument, "limit must be 0..10000")
+	}
+	// Make sure the id refers to an actual task so an unknown id returns
+	// NOT_FOUND rather than an empty list (which would be indistinguishable
+	// from a task with no logs).
+	if _, err := a.store.GetTask(ctx, id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "task %s not found", id)
+		}
+		return nil, status.Errorf(codes.Internal, "get: %v", err)
+	}
+	entries, err := a.store.ListTaskLogs(ctx, id, int(req.GetLimit()))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "list_task_logs: %v", err)
+	}
+	out := &pb.ListTaskLogsResponse{}
+	for _, e := range entries {
+		out.Items = append(out.Items, &pb.TaskLogEntry{
+			Id:        e.ID,
+			TaskId:    e.TaskID.String(),
+			Message:   e.Message,
+			CreatedAt: timestamppb.New(e.CreatedAt),
+		})
+	}
+	return out, nil
+}
+
 func (a *AdminServer) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.ListTasksResponse, error) {
 	f := store.ListTasksFilter{
 		Limit:  int(req.GetLimit()),

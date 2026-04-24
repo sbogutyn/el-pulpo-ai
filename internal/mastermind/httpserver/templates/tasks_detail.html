@@ -22,6 +22,17 @@
 </p>
 <pre>{{ printf "%s" .Task.Payload }}</pre>
 
+<h2>Logs</h2>
+{{ if .Logs }}
+  <ol class="task-logs">
+  {{ range .Logs }}
+    <li><time datetime="{{ .CreatedAt }}">{{ .CreatedAt.Format "2006-01-02 15:04:05" }}</time> — {{ .Message }}</li>
+  {{ end }}
+  </ol>
+{{ else }}
+  <p>No log entries yet.</p>
+{{ end }}
+
 <details>
   <summary>Update links</summary>
   <form method="post" action="/tasks/{{ .Task.ID }}/links">

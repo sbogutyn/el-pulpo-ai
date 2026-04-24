@@ -508,6 +508,182 @@ func (*UpdateProgressResponse) Descriptor() ([]byte, []int) {
 	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{8}
 }
 
+// AppendLogRequest appends one line to the task's immutable log.
+type AppendLogRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	TaskId        string                 `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppendLogRequest) Reset() {
+	*x = AppendLogRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendLogRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendLogRequest) ProtoMessage() {}
+
+func (x *AppendLogRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendLogRequest.ProtoReflect.Descriptor instead.
+func (*AppendLogRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AppendLogRequest) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *AppendLogRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *AppendLogRequest) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type AppendLogResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// id of the freshly inserted log row; useful for tests and downstream
+	// correlation.
+	Id            int64 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppendLogResponse) Reset() {
+	*x = AppendLogResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendLogResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendLogResponse) ProtoMessage() {}
+
+func (x *AppendLogResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendLogResponse.ProtoReflect.Descriptor instead.
+func (*AppendLogResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AppendLogResponse) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+// TaskLogEntry mirrors one row of the `task_logs` table.
+type TaskLogEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	TaskId        string                 `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskLogEntry) Reset() {
+	*x = TaskLogEntry{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskLogEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskLogEntry) ProtoMessage() {}
+
+func (x *TaskLogEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskLogEntry.ProtoReflect.Descriptor instead.
+func (*TaskLogEntry) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *TaskLogEntry) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *TaskLogEntry) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *TaskLogEntry) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *TaskLogEntry) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 // TaskDetail mirrors the mastermind `tasks` row. Nullable columns become empty
 // strings or zero timestamps on the wire; the MCP adapter omits them when
 // serializing to JSON.
@@ -536,7 +712,7 @@ type TaskDetail struct {
 
 func (x *TaskDetail) Reset() {
 	*x = TaskDetail{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	mi := &file_internal_proto_tasks_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +724,7 @@ func (x *TaskDetail) String() string {
 func (*TaskDetail) ProtoMessage() {}
 
 func (x *TaskDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	mi := &file_internal_proto_tasks_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +737,7 @@ func (x *TaskDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskDetail.ProtoReflect.Descriptor instead.
 func (*TaskDetail) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{9}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TaskDetail) GetId() string {
@@ -698,7 +874,7 @@ type CreateTaskRequest struct {
 
 func (x *CreateTaskRequest) Reset() {
 	*x = CreateTaskRequest{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	mi := &file_internal_proto_tasks_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -710,7 +886,7 @@ func (x *CreateTaskRequest) String() string {
 func (*CreateTaskRequest) ProtoMessage() {}
 
 func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	mi := &file_internal_proto_tasks_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -723,7 +899,7 @@ func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*CreateTaskRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{10}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CreateTaskRequest) GetName() string {
@@ -784,7 +960,7 @@ type CreateTaskResponse struct {
 
 func (x *CreateTaskResponse) Reset() {
 	*x = CreateTaskResponse{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	mi := &file_internal_proto_tasks_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -796,7 +972,7 @@ func (x *CreateTaskResponse) String() string {
 func (*CreateTaskResponse) ProtoMessage() {}
 
 func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	mi := &file_internal_proto_tasks_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -809,7 +985,7 @@ func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskResponse.ProtoReflect.Descriptor instead.
 func (*CreateTaskResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{11}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CreateTaskResponse) GetTask() *TaskDetail {
@@ -828,7 +1004,7 @@ type GetTaskRequest struct {
 
 func (x *GetTaskRequest) Reset() {
 	*x = GetTaskRequest{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[12]
+	mi := &file_internal_proto_tasks_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -840,7 +1016,7 @@ func (x *GetTaskRequest) String() string {
 func (*GetTaskRequest) ProtoMessage() {}
 
 func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[12]
+	mi := &file_internal_proto_tasks_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -853,7 +1029,7 @@ func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskRequest.ProtoReflect.Descriptor instead.
 func (*GetTaskRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{12}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetTaskRequest) GetId() string {
@@ -872,7 +1048,7 @@ type GetTaskResponse struct {
 
 func (x *GetTaskResponse) Reset() {
 	*x = GetTaskResponse{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[13]
+	mi := &file_internal_proto_tasks_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +1060,7 @@ func (x *GetTaskResponse) String() string {
 func (*GetTaskResponse) ProtoMessage() {}
 
 func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[13]
+	mi := &file_internal_proto_tasks_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +1073,7 @@ func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskResponse.ProtoReflect.Descriptor instead.
 func (*GetTaskResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{13}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetTaskResponse) GetTask() *TaskDetail {
@@ -918,7 +1094,7 @@ type ListTasksRequest struct {
 
 func (x *ListTasksRequest) Reset() {
 	*x = ListTasksRequest{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[14]
+	mi := &file_internal_proto_tasks_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -930,7 +1106,7 @@ func (x *ListTasksRequest) String() string {
 func (*ListTasksRequest) ProtoMessage() {}
 
 func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[14]
+	mi := &file_internal_proto_tasks_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -943,7 +1119,7 @@ func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
 func (*ListTasksRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{14}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListTasksRequest) GetStatus() string {
@@ -977,7 +1153,7 @@ type ListTasksResponse struct {
 
 func (x *ListTasksResponse) Reset() {
 	*x = ListTasksResponse{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[15]
+	mi := &file_internal_proto_tasks_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -989,7 +1165,7 @@ func (x *ListTasksResponse) String() string {
 func (*ListTasksResponse) ProtoMessage() {}
 
 func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[15]
+	mi := &file_internal_proto_tasks_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1002,7 +1178,7 @@ func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
 func (*ListTasksResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{15}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListTasksResponse) GetItems() []*TaskDetail {
@@ -1019,6 +1195,102 @@ func (x *ListTasksResponse) GetTotal() int32 {
 	return 0
 }
 
+type ListTaskLogsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTaskLogsRequest) Reset() {
+	*x = ListTaskLogsRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTaskLogsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTaskLogsRequest) ProtoMessage() {}
+
+func (x *ListTaskLogsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTaskLogsRequest.ProtoReflect.Descriptor instead.
+func (*ListTaskLogsRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListTaskLogsRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ListTaskLogsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListTaskLogsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*TaskLogEntry        `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTaskLogsResponse) Reset() {
+	*x = ListTaskLogsResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTaskLogsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTaskLogsResponse) ProtoMessage() {}
+
+func (x *ListTaskLogsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTaskLogsResponse.ProtoReflect.Descriptor instead.
+func (*ListTaskLogsResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ListTaskLogsResponse) GetItems() []*TaskLogEntry {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 // Success signals the task completed. Empty today, but kept as a message
 // (not a bare flag) so fields like output summary or timing can be added
 // without a breaking change.
@@ -1030,7 +1302,7 @@ type ReportResultRequest_Success struct {
 
 func (x *ReportResultRequest_Success) Reset() {
 	*x = ReportResultRequest_Success{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[16]
+	mi := &file_internal_proto_tasks_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +1314,7 @@ func (x *ReportResultRequest_Success) String() string {
 func (*ReportResultRequest_Success) ProtoMessage() {}
 
 func (x *ReportResultRequest_Success) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[16]
+	mi := &file_internal_proto_tasks_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1070,7 +1342,7 @@ type ReportResultRequest_Failure struct {
 
 func (x *ReportResultRequest_Failure) Reset() {
 	*x = ReportResultRequest_Failure{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[17]
+	mi := &file_internal_proto_tasks_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1082,7 +1354,7 @@ func (x *ReportResultRequest_Failure) String() string {
 func (*ReportResultRequest_Failure) ProtoMessage() {}
 
 func (x *ReportResultRequest_Failure) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[17]
+	mi := &file_internal_proto_tasks_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1136,7 +1408,19 @@ const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x12\n" +
 	"\x04note\x18\x03 \x01(\tR\x04note\"\x18\n" +
-	"\x16UpdateProgressResponse\"\xbc\x05\n" +
+	"\x16UpdateProgressResponse\"b\n" +
+	"\x10AppendLogRequest\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x17\n" +
+	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"#\n" +
+	"\x11AppendLogResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\"\x8c\x01\n" +
+	"\fTaskLogEntry\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x17\n" +
+	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xbc\x05\n" +
 	"\n" +
 	"TaskDetail\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -1182,17 +1466,24 @@ const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\x06offset\x18\x03 \x01(\x05R\x06offset\"]\n" +
 	"\x11ListTasksResponse\x122\n" +
 	"\x05items\x18\x01 \x03(\v2\x1c.elpulpo.tasks.v1.TaskDetailR\x05items\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total2\xfd\x02\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\";\n" +
+	"\x13ListTaskLogsRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"L\n" +
+	"\x14ListTaskLogsResponse\x124\n" +
+	"\x05items\x18\x01 \x03(\v2\x1e.elpulpo.tasks.v1.TaskLogEntryR\x05items2\xd3\x03\n" +
 	"\vTaskService\x12T\n" +
 	"\tClaimTask\x12\".elpulpo.tasks.v1.ClaimTaskRequest\x1a#.elpulpo.tasks.v1.ClaimTaskResponse\x12T\n" +
 	"\tHeartbeat\x12\".elpulpo.tasks.v1.HeartbeatRequest\x1a#.elpulpo.tasks.v1.HeartbeatResponse\x12]\n" +
 	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponse\x12c\n" +
-	"\x0eUpdateProgress\x12'.elpulpo.tasks.v1.UpdateProgressRequest\x1a(.elpulpo.tasks.v1.UpdateProgressResponse2\x8d\x02\n" +
+	"\x0eUpdateProgress\x12'.elpulpo.tasks.v1.UpdateProgressRequest\x1a(.elpulpo.tasks.v1.UpdateProgressResponse\x12T\n" +
+	"\tAppendLog\x12\".elpulpo.tasks.v1.AppendLogRequest\x1a#.elpulpo.tasks.v1.AppendLogResponse2\xec\x02\n" +
 	"\fAdminService\x12W\n" +
 	"\n" +
 	"CreateTask\x12#.elpulpo.tasks.v1.CreateTaskRequest\x1a$.elpulpo.tasks.v1.CreateTaskResponse\x12N\n" +
 	"\aGetTask\x12 .elpulpo.tasks.v1.GetTaskRequest\x1a!.elpulpo.tasks.v1.GetTaskResponse\x12T\n" +
-	"\tListTasks\x12\".elpulpo.tasks.v1.ListTasksRequest\x1a#.elpulpo.tasks.v1.ListTasksResponseB8Z6github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1b\x06proto3"
+	"\tListTasks\x12\".elpulpo.tasks.v1.ListTasksRequest\x1a#.elpulpo.tasks.v1.ListTasksResponse\x12]\n" +
+	"\fListTaskLogs\x12%.elpulpo.tasks.v1.ListTaskLogsRequest\x1a&.elpulpo.tasks.v1.ListTaskLogsResponseB8Z6github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1b\x06proto3"
 
 var (
 	file_internal_proto_tasks_proto_rawDescOnce sync.Once
@@ -1206,7 +1497,7 @@ func file_internal_proto_tasks_proto_rawDescGZIP() []byte {
 	return file_internal_proto_tasks_proto_rawDescData
 }
 
-var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_internal_proto_tasks_proto_goTypes = []any{
 	(*Task)(nil),                        // 0: elpulpo.tasks.v1.Task
 	(*ClaimTaskRequest)(nil),            // 1: elpulpo.tasks.v1.ClaimTaskRequest
@@ -1217,50 +1508,61 @@ var file_internal_proto_tasks_proto_goTypes = []any{
 	(*ReportResultResponse)(nil),        // 6: elpulpo.tasks.v1.ReportResultResponse
 	(*UpdateProgressRequest)(nil),       // 7: elpulpo.tasks.v1.UpdateProgressRequest
 	(*UpdateProgressResponse)(nil),      // 8: elpulpo.tasks.v1.UpdateProgressResponse
-	(*TaskDetail)(nil),                  // 9: elpulpo.tasks.v1.TaskDetail
-	(*CreateTaskRequest)(nil),           // 10: elpulpo.tasks.v1.CreateTaskRequest
-	(*CreateTaskResponse)(nil),          // 11: elpulpo.tasks.v1.CreateTaskResponse
-	(*GetTaskRequest)(nil),              // 12: elpulpo.tasks.v1.GetTaskRequest
-	(*GetTaskResponse)(nil),             // 13: elpulpo.tasks.v1.GetTaskResponse
-	(*ListTasksRequest)(nil),            // 14: elpulpo.tasks.v1.ListTasksRequest
-	(*ListTasksResponse)(nil),           // 15: elpulpo.tasks.v1.ListTasksResponse
-	(*ReportResultRequest_Success)(nil), // 16: elpulpo.tasks.v1.ReportResultRequest.Success
-	(*ReportResultRequest_Failure)(nil), // 17: elpulpo.tasks.v1.ReportResultRequest.Failure
-	(*timestamppb.Timestamp)(nil),       // 18: google.protobuf.Timestamp
+	(*AppendLogRequest)(nil),            // 9: elpulpo.tasks.v1.AppendLogRequest
+	(*AppendLogResponse)(nil),           // 10: elpulpo.tasks.v1.AppendLogResponse
+	(*TaskLogEntry)(nil),                // 11: elpulpo.tasks.v1.TaskLogEntry
+	(*TaskDetail)(nil),                  // 12: elpulpo.tasks.v1.TaskDetail
+	(*CreateTaskRequest)(nil),           // 13: elpulpo.tasks.v1.CreateTaskRequest
+	(*CreateTaskResponse)(nil),          // 14: elpulpo.tasks.v1.CreateTaskResponse
+	(*GetTaskRequest)(nil),              // 15: elpulpo.tasks.v1.GetTaskRequest
+	(*GetTaskResponse)(nil),             // 16: elpulpo.tasks.v1.GetTaskResponse
+	(*ListTasksRequest)(nil),            // 17: elpulpo.tasks.v1.ListTasksRequest
+	(*ListTasksResponse)(nil),           // 18: elpulpo.tasks.v1.ListTasksResponse
+	(*ListTaskLogsRequest)(nil),         // 19: elpulpo.tasks.v1.ListTaskLogsRequest
+	(*ListTaskLogsResponse)(nil),        // 20: elpulpo.tasks.v1.ListTaskLogsResponse
+	(*ReportResultRequest_Success)(nil), // 21: elpulpo.tasks.v1.ReportResultRequest.Success
+	(*ReportResultRequest_Failure)(nil), // 22: elpulpo.tasks.v1.ReportResultRequest.Failure
+	(*timestamppb.Timestamp)(nil),       // 23: google.protobuf.Timestamp
 }
 var file_internal_proto_tasks_proto_depIdxs = []int32{
 	0,  // 0: elpulpo.tasks.v1.ClaimTaskResponse.task:type_name -> elpulpo.tasks.v1.Task
-	16, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
-	17, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
-	18, // 3: elpulpo.tasks.v1.TaskDetail.scheduled_for:type_name -> google.protobuf.Timestamp
-	18, // 4: elpulpo.tasks.v1.TaskDetail.claimed_at:type_name -> google.protobuf.Timestamp
-	18, // 5: elpulpo.tasks.v1.TaskDetail.last_heartbeat_at:type_name -> google.protobuf.Timestamp
-	18, // 6: elpulpo.tasks.v1.TaskDetail.completed_at:type_name -> google.protobuf.Timestamp
-	18, // 7: elpulpo.tasks.v1.TaskDetail.created_at:type_name -> google.protobuf.Timestamp
-	18, // 8: elpulpo.tasks.v1.TaskDetail.updated_at:type_name -> google.protobuf.Timestamp
-	18, // 9: elpulpo.tasks.v1.CreateTaskRequest.scheduled_for:type_name -> google.protobuf.Timestamp
-	9,  // 10: elpulpo.tasks.v1.CreateTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
-	9,  // 11: elpulpo.tasks.v1.GetTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
-	9,  // 12: elpulpo.tasks.v1.ListTasksResponse.items:type_name -> elpulpo.tasks.v1.TaskDetail
-	1,  // 13: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
-	3,  // 14: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
-	5,  // 15: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
-	7,  // 16: elpulpo.tasks.v1.TaskService.UpdateProgress:input_type -> elpulpo.tasks.v1.UpdateProgressRequest
-	10, // 17: elpulpo.tasks.v1.AdminService.CreateTask:input_type -> elpulpo.tasks.v1.CreateTaskRequest
-	12, // 18: elpulpo.tasks.v1.AdminService.GetTask:input_type -> elpulpo.tasks.v1.GetTaskRequest
-	14, // 19: elpulpo.tasks.v1.AdminService.ListTasks:input_type -> elpulpo.tasks.v1.ListTasksRequest
-	2,  // 20: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
-	4,  // 21: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
-	6,  // 22: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
-	8,  // 23: elpulpo.tasks.v1.TaskService.UpdateProgress:output_type -> elpulpo.tasks.v1.UpdateProgressResponse
-	11, // 24: elpulpo.tasks.v1.AdminService.CreateTask:output_type -> elpulpo.tasks.v1.CreateTaskResponse
-	13, // 25: elpulpo.tasks.v1.AdminService.GetTask:output_type -> elpulpo.tasks.v1.GetTaskResponse
-	15, // 26: elpulpo.tasks.v1.AdminService.ListTasks:output_type -> elpulpo.tasks.v1.ListTasksResponse
-	20, // [20:27] is the sub-list for method output_type
-	13, // [13:20] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	21, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
+	22, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
+	23, // 3: elpulpo.tasks.v1.TaskLogEntry.created_at:type_name -> google.protobuf.Timestamp
+	23, // 4: elpulpo.tasks.v1.TaskDetail.scheduled_for:type_name -> google.protobuf.Timestamp
+	23, // 5: elpulpo.tasks.v1.TaskDetail.claimed_at:type_name -> google.protobuf.Timestamp
+	23, // 6: elpulpo.tasks.v1.TaskDetail.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	23, // 7: elpulpo.tasks.v1.TaskDetail.completed_at:type_name -> google.protobuf.Timestamp
+	23, // 8: elpulpo.tasks.v1.TaskDetail.created_at:type_name -> google.protobuf.Timestamp
+	23, // 9: elpulpo.tasks.v1.TaskDetail.updated_at:type_name -> google.protobuf.Timestamp
+	23, // 10: elpulpo.tasks.v1.CreateTaskRequest.scheduled_for:type_name -> google.protobuf.Timestamp
+	12, // 11: elpulpo.tasks.v1.CreateTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
+	12, // 12: elpulpo.tasks.v1.GetTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
+	12, // 13: elpulpo.tasks.v1.ListTasksResponse.items:type_name -> elpulpo.tasks.v1.TaskDetail
+	11, // 14: elpulpo.tasks.v1.ListTaskLogsResponse.items:type_name -> elpulpo.tasks.v1.TaskLogEntry
+	1,  // 15: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
+	3,  // 16: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
+	5,  // 17: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
+	7,  // 18: elpulpo.tasks.v1.TaskService.UpdateProgress:input_type -> elpulpo.tasks.v1.UpdateProgressRequest
+	9,  // 19: elpulpo.tasks.v1.TaskService.AppendLog:input_type -> elpulpo.tasks.v1.AppendLogRequest
+	13, // 20: elpulpo.tasks.v1.AdminService.CreateTask:input_type -> elpulpo.tasks.v1.CreateTaskRequest
+	15, // 21: elpulpo.tasks.v1.AdminService.GetTask:input_type -> elpulpo.tasks.v1.GetTaskRequest
+	17, // 22: elpulpo.tasks.v1.AdminService.ListTasks:input_type -> elpulpo.tasks.v1.ListTasksRequest
+	19, // 23: elpulpo.tasks.v1.AdminService.ListTaskLogs:input_type -> elpulpo.tasks.v1.ListTaskLogsRequest
+	2,  // 24: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
+	4,  // 25: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
+	6,  // 26: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
+	8,  // 27: elpulpo.tasks.v1.TaskService.UpdateProgress:output_type -> elpulpo.tasks.v1.UpdateProgressResponse
+	10, // 28: elpulpo.tasks.v1.TaskService.AppendLog:output_type -> elpulpo.tasks.v1.AppendLogResponse
+	14, // 29: elpulpo.tasks.v1.AdminService.CreateTask:output_type -> elpulpo.tasks.v1.CreateTaskResponse
+	16, // 30: elpulpo.tasks.v1.AdminService.GetTask:output_type -> elpulpo.tasks.v1.GetTaskResponse
+	18, // 31: elpulpo.tasks.v1.AdminService.ListTasks:output_type -> elpulpo.tasks.v1.ListTasksResponse
+	20, // 32: elpulpo.tasks.v1.AdminService.ListTaskLogs:output_type -> elpulpo.tasks.v1.ListTaskLogsResponse
+	24, // [24:33] is the sub-list for method output_type
+	15, // [15:24] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_internal_proto_tasks_proto_init() }
@@ -1278,7 +1580,7 @@ func file_internal_proto_tasks_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_tasks_proto_rawDesc), len(file_internal_proto_tasks_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

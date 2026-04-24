@@ -61,12 +61,15 @@ func run() error {
 		return err
 	}
 	policy := map[string]string{
-		"/elpulpo.tasks.v1.TaskService/ClaimTask":    cfg.WorkerToken,
-		"/elpulpo.tasks.v1.TaskService/Heartbeat":    cfg.WorkerToken,
-		"/elpulpo.tasks.v1.TaskService/ReportResult": cfg.WorkerToken,
-		"/elpulpo.tasks.v1.AdminService/CreateTask":  cfg.AdminToken,
-		"/elpulpo.tasks.v1.AdminService/GetTask":     cfg.AdminToken,
-		"/elpulpo.tasks.v1.AdminService/ListTasks":   cfg.AdminToken,
+		"/elpulpo.tasks.v1.TaskService/ClaimTask":      cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/Heartbeat":      cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/ReportResult":   cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/UpdateProgress": cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/AppendLog":      cfg.WorkerToken,
+		"/elpulpo.tasks.v1.AdminService/CreateTask":    cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/GetTask":       cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListTasks":     cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListTaskLogs":  cfg.AdminToken,
 	}
 	gs := grpc.NewServer(grpc.UnaryInterceptor(auth.PerMethodInterceptor(policy)))
 	pb.RegisterTaskServiceServer(gs, grpcserver.New(s))

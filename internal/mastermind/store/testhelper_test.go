@@ -77,7 +77,7 @@ func newPool(t *testing.T) *pgxpool.Pool {
 
 func truncate(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
-	_, err := pool.Exec(context.Background(), "TRUNCATE TABLE tasks")
+	_, err := pool.Exec(context.Background(), "TRUNCATE TABLE tasks CASCADE")
 	if err != nil {
 		t.Fatalf("truncate: %v", err)
 	}

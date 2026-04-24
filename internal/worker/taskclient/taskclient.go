@@ -116,6 +116,22 @@ func (t *Task) Progress(ctx context.Context, note string) error {
 	return err
 }
 
+// AppendLog appends one line to the task's append-only log. Unlike
+// [Task.Progress], which overwrites a single "current status" note, AppendLog
+// is used to record a narrative trail of what the worker did. AppendLog also
+// refreshes the lease. Returns the server-assigned row id.
+func (t *Task) AppendLog(ctx context.Context, message string) (int64, error) {
+	resp, err := t.rpc.AppendLog(ctx, &pb.AppendLogRequest{
+		WorkerId: t.workerID,
+		TaskId:   t.id,
+		Message:  message,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetId(), nil
+}
+
 // Complete finalizes the task as successful. Subsequent calls return
 // [ErrAlreadyFinalized]. Any running auto-heartbeat is stopped before the
 // RPC so it can't race the server-side terminal transition.

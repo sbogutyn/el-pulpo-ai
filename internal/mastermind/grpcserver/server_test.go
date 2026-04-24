@@ -23,7 +23,7 @@ func startBufServer(t *testing.T) (pb.TaskServiceClient, *store.Store) {
 		t.Fatalf("store.Open: %v", err)
 	}
 	t.Cleanup(s.Close)
-	_, err = s.Pool().Exec(context.Background(), "TRUNCATE TABLE tasks")
+	_, err = s.Pool().Exec(context.Background(), "TRUNCATE TABLE tasks CASCADE")
 	if err != nil {
 		t.Fatal(err)
 	}

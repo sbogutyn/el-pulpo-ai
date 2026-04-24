@@ -31,7 +31,7 @@ func TestE2E_100TasksAreEachRunOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	_, _ = s.Pool().Exec(ctx, "TRUNCATE TABLE tasks")
+	_, _ = s.Pool().Exec(ctx, "TRUNCATE TABLE tasks CASCADE")
 
 	const N = 100
 	for i := 0; i < N; i++ {
