@@ -36,6 +36,7 @@ type Task struct {
 	LastHeartbeatAt *time.Time      `json:"last_heartbeat_at,omitempty"`
 	CompletedAt     *time.Time      `json:"completed_at,omitempty"`
 	LastError       *string         `json:"last_error,omitempty"`
+	ProgressNote    *string         `json:"progress_note,omitempty"`
 	JiraURL         *string         `json:"jira_url,omitempty"`
 	GithubPRURL     *string         `json:"github_pr_url,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
@@ -56,7 +57,7 @@ const taskColumns = `
   id, name, payload, priority, status, scheduled_for,
   attempt_count, max_attempts,
   claimed_by, claimed_at, last_heartbeat_at,
-  completed_at, last_error,
+  completed_at, last_error, progress_note,
   jira_url, github_pr_url,
   created_at, updated_at
 `
@@ -67,7 +68,7 @@ func scanTask(row pgx.Row) (Task, error) {
 		&t.ID, &t.Name, &t.Payload, &t.Priority, &t.Status, &t.ScheduledFor,
 		&t.AttemptCount, &t.MaxAttempts,
 		&t.ClaimedBy, &t.ClaimedAt, &t.LastHeartbeatAt,
-		&t.CompletedAt, &t.LastError,
+		&t.CompletedAt, &t.LastError, &t.ProgressNote,
 		&t.JiraURL, &t.GithubPRURL,
 		&t.CreatedAt, &t.UpdatedAt,
 	)
@@ -261,6 +262,7 @@ func (s *Store) RequeueTask(ctx context.Context, id uuid.UUID) (Task, error) {
           last_heartbeat_at = NULL,
           completed_at      = NULL,
           last_error        = NULL,
+          progress_note     = NULL,
           attempt_count     = 0,
           scheduled_for     = NULL,
           updated_at        = now()
