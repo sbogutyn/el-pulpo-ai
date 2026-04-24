@@ -1,0 +1,70 @@
+# docker-compose.e2e.yml — production-like stack for the Go end-to-end test
+# suite (e2e/*, built with `//go:build e2e`). Brought up by `make test-e2e`.
+#
+# Host ports are deliberately non-default so the stack does not clash with a
+# developer's `make dev-up` / `make run-mastermind` / `make run-worker`
+# session. See docs/superpowers/specs/2026-04-24-e2e-testing-design.md.
+
+name: el-pulpo-e2e
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pulpo
+      POSTGRES_PASSWORD: pulpo
+      POSTGRES_DB: pulpo
+    ports:
+      - "127.0.0.1:15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulpo -d pulpo"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+  mastermind:
+    build:
+      context: .
+      dockerfile: Dockerfile.mastermind
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://pulpo:pulpo@postgres:5432/pulpo?sslmode=disable"
+      GRPC_LISTEN_ADDR: ":50051"
+      HTTP_LISTEN_ADDR: ":8080"
+      WORKER_TOKEN: "e2e-worker-token"
+      ADMIN_TOKEN: "e2e-admin-token"
+      ADMIN_USER: "e2e"
+      ADMIN_PASSWORD: "e2e"
+      VISIBILITY_TIMEOUT: "5s"
+      REAPER_INTERVAL: "1s"
+      LOG_LEVEL: "info"
+      LOG_FORMAT: "text"
+    ports:
+      - "127.0.0.1:15051:50051"
+      - "127.0.0.1:18080:8080"
+    # No in-container healthcheck: the mastermind image is distroless and
+    # has no shell / curl / wget to probe with. The Go test harness waits
+    # for /readyz from the host before declaring the stack ready.
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      - mastermind
+    environment:
+      MASTERMIND_ADDR: "mastermind:50051"
+      WORKER_TOKEN: "e2e-worker-token"
+      # The worker binds loopback by default. For the e2e stack we publish
+      # it through Docker's NAT, so bind it on all interfaces inside the
+      # container. The host port mapping keeps it on 127.0.0.1 externally.
+      WORKER_MCP_LISTEN_ADDR: "0.0.0.0:7777"
+      HEARTBEAT_INTERVAL: "1s"
+      LOG_LEVEL: "info"
+      LOG_FORMAT: "text"
+    ports:
+      - "127.0.0.1:17777:7777"
+    # Same story as mastermind: the Go harness waits for /healthz from the
+    # host.

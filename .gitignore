@@ -2,6 +2,7 @@
 /bin/
 /mastermind
 /worker
+/e2e/.bin/
 
 # Test output
 coverage.out
