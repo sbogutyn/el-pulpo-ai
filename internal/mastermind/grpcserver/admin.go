@@ -3,7 +3,9 @@ package grpcserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -108,4 +110,19 @@ func toTaskDetail(t store.Task) *pb.TaskDetail {
 		d.GithubPrUrl = *t.GithubPRURL
 	}
 	return d
+}
+
+func (a *AdminServer) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.GetTaskResponse, error) {
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "id must be a UUID")
+	}
+	t, err := a.store.GetTask(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "task %s not found", id)
+		}
+		return nil, status.Errorf(codes.Internal, "get: %v", err)
+	}
+	return &pb.GetTaskResponse{Task: toTaskDetail(t)}, nil
 }

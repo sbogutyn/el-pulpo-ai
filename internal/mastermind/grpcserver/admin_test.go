@@ -158,3 +158,35 @@ func TestCreateTask_IssueRefsRoundTrip(t *testing.T) {
 		t.Errorf("GithubPrUrl=%q, want full URL", resp.Task.GithubPrUrl)
 	}
 }
+
+func TestGetTask_Happy(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	got, err := admin.GetTask(adminCtx(), &pb.GetTaskRequest{Id: created.Task.Id})
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Task.Id != created.Task.Id {
+		t.Errorf("Id mismatch: got %q, want %q", got.Task.Id, created.Task.Id)
+	}
+}
+
+func TestGetTask_BadUUID(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	_, err := admin.GetTask(adminCtx(), &pb.GetTaskRequest{Id: "not-a-uuid"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestGetTask_NotFound(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	// Valid but unknown UUID.
+	_, err := admin.GetTask(adminCtx(), &pb.GetTaskRequest{Id: "00000000-0000-0000-0000-000000000000"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("code=%v, want NotFound", status.Code(err))
+	}
+}
