@@ -163,3 +163,51 @@ func TestGetTaskTool_NotFound_ToolError(t *testing.T) {
 		t.Fatal("want IsError=true for missing id")
 	}
 }
+
+func TestListTasksTool_Happy(t *testing.T) {
+	admin, _ := startAdminBuf(t)
+	session := startMCPClient(t, admin)
+
+	for i := 0; i < 3; i++ {
+		_, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+			Name:      "create_task",
+			Arguments: map[string]any{"name": "x"},
+		})
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "list_tasks",
+		Arguments: map[string]any{},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("ListTasks: %v %+v", err, res)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var out struct {
+		Items []TaskDetail `json:"items"`
+		Total int          `json:"total"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Total != 3 || len(out.Items) != 3 {
+		t.Errorf("got total=%d items=%d, want 3/3", out.Total, len(out.Items))
+	}
+}
+
+func TestListTasksTool_BadStatus_ToolError(t *testing.T) {
+	admin, _ := startAdminBuf(t)
+	session := startMCPClient(t, admin)
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "list_tasks",
+		Arguments: map[string]any{"status": "bogus"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("want tool error for bad status")
+	}
+}

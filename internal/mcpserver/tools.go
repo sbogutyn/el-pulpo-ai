@@ -153,6 +153,42 @@ func registerGetTask(s *mcp.Server, admin pb.AdminServiceClient) {
 	})
 }
 
+type ListTasksInput struct {
+	Status string `json:"status,omitempty" jsonschema:"filter: pending|claimed|running|completed|failed"`
+	Limit  int32  `json:"limit,omitempty" jsonschema:"page size, default 50, max 500"`
+	Offset int32  `json:"offset,omitempty" jsonschema:"pagination offset, default 0"`
+}
+
+type ListTasksOutput struct {
+	Items []TaskDetail `json:"items"`
+	Total int32        `json:"total"`
+}
+
+func registerListTasks(s *mcp.Server, admin pb.AdminServiceClient) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "list_tasks",
+		Description: "List tasks, optionally filtered by status. Paginated.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in ListTasksInput) (*mcp.CallToolResult, ListTasksOutput, error) {
+		resp, err := admin.ListTasks(ctx, &pb.ListTasksRequest{
+			Status: in.Status,
+			Limit:  in.Limit,
+			Offset: in.Offset,
+		})
+		if err != nil {
+			return toolErr(err, "list_tasks"), ListTasksOutput{}, nil
+		}
+		out := ListTasksOutput{Total: resp.GetTotal()}
+		for _, p := range resp.GetItems() {
+			out.Items = append(out.Items, fromProtoTask(p))
+		}
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{
+				Text: fmt.Sprintf("%d of %d tasks", len(out.Items), out.Total),
+			}},
+		}, out, nil
+	})
+}
+
 // toolErr converts a gRPC error from mastermind into an MCP tool error.
 // We always return tool errors (IsError=true) rather than protocol errors —
 // the MCP server itself should never fail a call just because an RPC didn't.
