@@ -60,8 +60,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	gs := grpc.NewServer(grpc.UnaryInterceptor(auth.BearerInterceptor(cfg.WorkerToken)))
+	policy := map[string]string{
+		"/elpulpo.tasks.v1.TaskService/ClaimTask":    cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/Heartbeat":    cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/ReportResult": cfg.WorkerToken,
+		"/elpulpo.tasks.v1.AdminService/CreateTask":  cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/GetTask":     cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListTasks":   cfg.AdminToken,
+	}
+	gs := grpc.NewServer(grpc.UnaryInterceptor(auth.PerMethodInterceptor(policy)))
 	pb.RegisterTaskServiceServer(gs, grpcserver.New(s))
+	pb.RegisterAdminServiceServer(gs, grpcserver.NewAdmin(s))
 	grpcErrCh := make(chan error, 1)
 	go func() {
 		log.Info("grpc: listening", "addr", cfg.GRPCListenAddr)
