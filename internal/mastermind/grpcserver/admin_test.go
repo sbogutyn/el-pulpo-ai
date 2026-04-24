@@ -140,3 +140,21 @@ func TestCreateTask_DefaultsMaxAttempts(t *testing.T) {
 		t.Errorf("MaxAttempts=%d, want 3", resp.Task.MaxAttempts)
 	}
 }
+
+func TestCreateTask_IssueRefsRoundTrip(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	resp, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{
+		Name:        "with-refs",
+		JiraUrl:     "https://pulpo.atlassian.net/browse/PULPO-1",
+		GithubPrUrl: "https://github.com/sbogutyn/el-pulpo-ai/pull/1",
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if resp.Task.JiraUrl != "https://pulpo.atlassian.net/browse/PULPO-1" {
+		t.Errorf("JiraUrl=%q, want full URL", resp.Task.JiraUrl)
+	}
+	if resp.Task.GithubPrUrl != "https://github.com/sbogutyn/el-pulpo-ai/pull/1" {
+		t.Errorf("GithubPrUrl=%q, want full URL", resp.Task.GithubPrUrl)
+	}
+}

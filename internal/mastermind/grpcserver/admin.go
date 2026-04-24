@@ -54,6 +54,12 @@ func (a *AdminServer) CreateTask(ctx context.Context, req *pb.CreateTaskRequest)
 		t := sf.AsTime()
 		in.ScheduledFor = &t
 	}
+	if v := req.GetJiraUrl(); v != "" {
+		in.JiraURL = &v
+	}
+	if v := req.GetGithubPrUrl(); v != "" {
+		in.GithubPRURL = &v
+	}
 
 	t, err := a.store.CreateTask(ctx, in)
 	if err != nil {
@@ -94,6 +100,12 @@ func toTaskDetail(t store.Task) *pb.TaskDetail {
 	}
 	if t.LastError != nil {
 		d.LastError = *t.LastError
+	}
+	if t.JiraURL != nil {
+		d.JiraUrl = *t.JiraURL
+	}
+	if t.GithubPRURL != nil {
+		d.GithubPrUrl = *t.GithubPRURL
 	}
 	return d
 }
