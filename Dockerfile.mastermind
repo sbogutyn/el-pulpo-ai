@@ -1,12 +1,41 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.25-alpine AS build
-WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/mastermind ./cmd/mastermind
+ARG GO_VERSION=1.25
+ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian12:nonroot
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+ENV CGO_ENABLED=0 \
+    GOOS=$TARGETOS \
+    GOARCH=$TARGETARCH \
+    GOFLAGS=-trimpath
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags="-s -w" -o /out/mastermind ./cmd/mastermind
+
+FROM ${RUNTIME_IMAGE}
+ARG VERSION
+ARG COMMIT
+ARG BUILD_DATE
+
+LABEL org.opencontainers.image.title="el-pulpo-mastermind" \
+      org.opencontainers.image.source="https://github.com/sbogutyn/el-pulpo-ai" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${COMMIT}" \
+      org.opencontainers.image.created="${BUILD_DATE}"
+
 WORKDIR /app
 COPY --from=build /out/mastermind /app/mastermind
 COPY migrations /app/migrations

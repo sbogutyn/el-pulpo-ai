@@ -16,3 +16,6 @@ coverage.out
 
 # Docker / local state
 .tmp/
+
+# Worktrees
+.worktrees/
