@@ -1291,6 +1291,341 @@ func (x *ListTaskLogsResponse) GetItems() []*TaskLogEntry {
 	return nil
 }
 
+type CancelTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelTaskRequest) Reset() {
+	*x = CancelTaskRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelTaskRequest) ProtoMessage() {}
+
+func (x *CancelTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelTaskRequest.ProtoReflect.Descriptor instead.
+func (*CancelTaskRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *CancelTaskRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CancelTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelTaskResponse) Reset() {
+	*x = CancelTaskResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelTaskResponse) ProtoMessage() {}
+
+func (x *CancelTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelTaskResponse.ProtoReflect.Descriptor instead.
+func (*CancelTaskResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{22}
+}
+
+type RetryTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryTaskRequest) Reset() {
+	*x = RetryTaskRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryTaskRequest) ProtoMessage() {}
+
+func (x *RetryTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryTaskRequest.ProtoReflect.Descriptor instead.
+func (*RetryTaskRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RetryTaskRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type RetryTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *TaskDetail            `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RetryTaskResponse) Reset() {
+	*x = RetryTaskResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RetryTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RetryTaskResponse) ProtoMessage() {}
+
+func (x *RetryTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RetryTaskResponse.ProtoReflect.Descriptor instead.
+func (*RetryTaskResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *RetryTaskResponse) GetTask() *TaskDetail {
+	if x != nil {
+		return x.Task
+	}
+	return nil
+}
+
+// WorkerInfo describes one distinct worker identity that has at some point
+// claimed a task. All fields are derived from aggregations over the tasks
+// table: mastermind does not persist a separate worker registry.
+type WorkerInfo struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// claimed_by value used by this worker.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Number of tasks currently in `claimed` or `running` state that are
+	// owned by this worker.
+	ActiveTasks int32 `protobuf:"varint,2,opt,name=active_tasks,json=activeTasks,proto3" json:"active_tasks,omitempty"`
+	// Most recent heartbeat (or claim time, if the worker never heartbeated)
+	// across any task this worker has owned. Zero when the worker is only
+	// known from historical, already-completed tasks.
+	LastSeenAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	// Lifetime count of tasks this worker has completed successfully.
+	CompletedTasks int32 `protobuf:"varint,4,opt,name=completed_tasks,json=completedTasks,proto3" json:"completed_tasks,omitempty"`
+	// Lifetime count of tasks this worker claimed that ended in `failed`.
+	FailedTasks   int32 `protobuf:"varint,5,opt,name=failed_tasks,json=failedTasks,proto3" json:"failed_tasks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkerInfo) Reset() {
+	*x = WorkerInfo{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkerInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkerInfo) ProtoMessage() {}
+
+func (x *WorkerInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkerInfo.ProtoReflect.Descriptor instead.
+func (*WorkerInfo) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *WorkerInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *WorkerInfo) GetActiveTasks() int32 {
+	if x != nil {
+		return x.ActiveTasks
+	}
+	return 0
+}
+
+func (x *WorkerInfo) GetLastSeenAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSeenAt
+	}
+	return nil
+}
+
+func (x *WorkerInfo) GetCompletedTasks() int32 {
+	if x != nil {
+		return x.CompletedTasks
+	}
+	return 0
+}
+
+func (x *WorkerInfo) GetFailedTasks() int32 {
+	if x != nil {
+		return x.FailedTasks
+	}
+	return 0
+}
+
+type ListWorkersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkersRequest) Reset() {
+	*x = ListWorkersRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkersRequest) ProtoMessage() {}
+
+func (x *ListWorkersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkersRequest.ProtoReflect.Descriptor instead.
+func (*ListWorkersRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{26}
+}
+
+type ListWorkersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*WorkerInfo          `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkersResponse) Reset() {
+	*x = ListWorkersResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkersResponse) ProtoMessage() {}
+
+func (x *ListWorkersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkersResponse.ProtoReflect.Descriptor instead.
+func (*ListWorkersResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ListWorkersResponse) GetItems() []*WorkerInfo {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 // Success signals the task completed. Empty today, but kept as a message
 // (not a bare flag) so fields like output summary or timing can be added
 // without a breaking change.
@@ -1302,7 +1637,7 @@ type ReportResultRequest_Success struct {
 
 func (x *ReportResultRequest_Success) Reset() {
 	*x = ReportResultRequest_Success{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[21]
+	mi := &file_internal_proto_tasks_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +1649,7 @@ func (x *ReportResultRequest_Success) String() string {
 func (*ReportResultRequest_Success) ProtoMessage() {}
 
 func (x *ReportResultRequest_Success) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[21]
+	mi := &file_internal_proto_tasks_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1342,7 +1677,7 @@ type ReportResultRequest_Failure struct {
 
 func (x *ReportResultRequest_Failure) Reset() {
 	*x = ReportResultRequest_Failure{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[22]
+	mi := &file_internal_proto_tasks_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1354,7 +1689,7 @@ func (x *ReportResultRequest_Failure) String() string {
 func (*ReportResultRequest_Failure) ProtoMessage() {}
 
 func (x *ReportResultRequest_Failure) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[22]
+	mi := &file_internal_proto_tasks_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1471,19 +1806,41 @@ const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\"L\n" +
 	"\x14ListTaskLogsResponse\x124\n" +
-	"\x05items\x18\x01 \x03(\v2\x1e.elpulpo.tasks.v1.TaskLogEntryR\x05items2\xd3\x03\n" +
+	"\x05items\x18\x01 \x03(\v2\x1e.elpulpo.tasks.v1.TaskLogEntryR\x05items\"#\n" +
+	"\x11CancelTaskRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x14\n" +
+	"\x12CancelTaskResponse\"\"\n" +
+	"\x10RetryTaskRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"E\n" +
+	"\x11RetryTaskResponse\x120\n" +
+	"\x04task\x18\x01 \x01(\v2\x1c.elpulpo.tasks.v1.TaskDetailR\x04task\"\xc9\x01\n" +
+	"\n" +
+	"WorkerInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\factive_tasks\x18\x02 \x01(\x05R\vactiveTasks\x12<\n" +
+	"\flast_seen_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastSeenAt\x12'\n" +
+	"\x0fcompleted_tasks\x18\x04 \x01(\x05R\x0ecompletedTasks\x12!\n" +
+	"\ffailed_tasks\x18\x05 \x01(\x05R\vfailedTasks\"\x14\n" +
+	"\x12ListWorkersRequest\"I\n" +
+	"\x13ListWorkersResponse\x122\n" +
+	"\x05items\x18\x01 \x03(\v2\x1c.elpulpo.tasks.v1.WorkerInfoR\x05items2\xd3\x03\n" +
 	"\vTaskService\x12T\n" +
 	"\tClaimTask\x12\".elpulpo.tasks.v1.ClaimTaskRequest\x1a#.elpulpo.tasks.v1.ClaimTaskResponse\x12T\n" +
 	"\tHeartbeat\x12\".elpulpo.tasks.v1.HeartbeatRequest\x1a#.elpulpo.tasks.v1.HeartbeatResponse\x12]\n" +
 	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponse\x12c\n" +
 	"\x0eUpdateProgress\x12'.elpulpo.tasks.v1.UpdateProgressRequest\x1a(.elpulpo.tasks.v1.UpdateProgressResponse\x12T\n" +
-	"\tAppendLog\x12\".elpulpo.tasks.v1.AppendLogRequest\x1a#.elpulpo.tasks.v1.AppendLogResponse2\xec\x02\n" +
+	"\tAppendLog\x12\".elpulpo.tasks.v1.AppendLogRequest\x1a#.elpulpo.tasks.v1.AppendLogResponse2\xf7\x04\n" +
 	"\fAdminService\x12W\n" +
 	"\n" +
 	"CreateTask\x12#.elpulpo.tasks.v1.CreateTaskRequest\x1a$.elpulpo.tasks.v1.CreateTaskResponse\x12N\n" +
 	"\aGetTask\x12 .elpulpo.tasks.v1.GetTaskRequest\x1a!.elpulpo.tasks.v1.GetTaskResponse\x12T\n" +
 	"\tListTasks\x12\".elpulpo.tasks.v1.ListTasksRequest\x1a#.elpulpo.tasks.v1.ListTasksResponse\x12]\n" +
-	"\fListTaskLogs\x12%.elpulpo.tasks.v1.ListTaskLogsRequest\x1a&.elpulpo.tasks.v1.ListTaskLogsResponseB8Z6github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1b\x06proto3"
+	"\fListTaskLogs\x12%.elpulpo.tasks.v1.ListTaskLogsRequest\x1a&.elpulpo.tasks.v1.ListTaskLogsResponse\x12W\n" +
+	"\n" +
+	"CancelTask\x12#.elpulpo.tasks.v1.CancelTaskRequest\x1a$.elpulpo.tasks.v1.CancelTaskResponse\x12T\n" +
+	"\tRetryTask\x12\".elpulpo.tasks.v1.RetryTaskRequest\x1a#.elpulpo.tasks.v1.RetryTaskResponse\x12Z\n" +
+	"\vListWorkers\x12$.elpulpo.tasks.v1.ListWorkersRequest\x1a%.elpulpo.tasks.v1.ListWorkersResponseB8Z6github.com/sbogutyn/el-pulpo-ai/internal/proto;tasksv1b\x06proto3"
 
 var (
 	file_internal_proto_tasks_proto_rawDescOnce sync.Once
@@ -1497,7 +1854,7 @@ func file_internal_proto_tasks_proto_rawDescGZIP() []byte {
 	return file_internal_proto_tasks_proto_rawDescData
 }
 
-var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_internal_proto_tasks_proto_goTypes = []any{
 	(*Task)(nil),                        // 0: elpulpo.tasks.v1.Task
 	(*ClaimTaskRequest)(nil),            // 1: elpulpo.tasks.v1.ClaimTaskRequest
@@ -1520,49 +1877,65 @@ var file_internal_proto_tasks_proto_goTypes = []any{
 	(*ListTasksResponse)(nil),           // 18: elpulpo.tasks.v1.ListTasksResponse
 	(*ListTaskLogsRequest)(nil),         // 19: elpulpo.tasks.v1.ListTaskLogsRequest
 	(*ListTaskLogsResponse)(nil),        // 20: elpulpo.tasks.v1.ListTaskLogsResponse
-	(*ReportResultRequest_Success)(nil), // 21: elpulpo.tasks.v1.ReportResultRequest.Success
-	(*ReportResultRequest_Failure)(nil), // 22: elpulpo.tasks.v1.ReportResultRequest.Failure
-	(*timestamppb.Timestamp)(nil),       // 23: google.protobuf.Timestamp
+	(*CancelTaskRequest)(nil),           // 21: elpulpo.tasks.v1.CancelTaskRequest
+	(*CancelTaskResponse)(nil),          // 22: elpulpo.tasks.v1.CancelTaskResponse
+	(*RetryTaskRequest)(nil),            // 23: elpulpo.tasks.v1.RetryTaskRequest
+	(*RetryTaskResponse)(nil),           // 24: elpulpo.tasks.v1.RetryTaskResponse
+	(*WorkerInfo)(nil),                  // 25: elpulpo.tasks.v1.WorkerInfo
+	(*ListWorkersRequest)(nil),          // 26: elpulpo.tasks.v1.ListWorkersRequest
+	(*ListWorkersResponse)(nil),         // 27: elpulpo.tasks.v1.ListWorkersResponse
+	(*ReportResultRequest_Success)(nil), // 28: elpulpo.tasks.v1.ReportResultRequest.Success
+	(*ReportResultRequest_Failure)(nil), // 29: elpulpo.tasks.v1.ReportResultRequest.Failure
+	(*timestamppb.Timestamp)(nil),       // 30: google.protobuf.Timestamp
 }
 var file_internal_proto_tasks_proto_depIdxs = []int32{
 	0,  // 0: elpulpo.tasks.v1.ClaimTaskResponse.task:type_name -> elpulpo.tasks.v1.Task
-	21, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
-	22, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
-	23, // 3: elpulpo.tasks.v1.TaskLogEntry.created_at:type_name -> google.protobuf.Timestamp
-	23, // 4: elpulpo.tasks.v1.TaskDetail.scheduled_for:type_name -> google.protobuf.Timestamp
-	23, // 5: elpulpo.tasks.v1.TaskDetail.claimed_at:type_name -> google.protobuf.Timestamp
-	23, // 6: elpulpo.tasks.v1.TaskDetail.last_heartbeat_at:type_name -> google.protobuf.Timestamp
-	23, // 7: elpulpo.tasks.v1.TaskDetail.completed_at:type_name -> google.protobuf.Timestamp
-	23, // 8: elpulpo.tasks.v1.TaskDetail.created_at:type_name -> google.protobuf.Timestamp
-	23, // 9: elpulpo.tasks.v1.TaskDetail.updated_at:type_name -> google.protobuf.Timestamp
-	23, // 10: elpulpo.tasks.v1.CreateTaskRequest.scheduled_for:type_name -> google.protobuf.Timestamp
+	28, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
+	29, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
+	30, // 3: elpulpo.tasks.v1.TaskLogEntry.created_at:type_name -> google.protobuf.Timestamp
+	30, // 4: elpulpo.tasks.v1.TaskDetail.scheduled_for:type_name -> google.protobuf.Timestamp
+	30, // 5: elpulpo.tasks.v1.TaskDetail.claimed_at:type_name -> google.protobuf.Timestamp
+	30, // 6: elpulpo.tasks.v1.TaskDetail.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	30, // 7: elpulpo.tasks.v1.TaskDetail.completed_at:type_name -> google.protobuf.Timestamp
+	30, // 8: elpulpo.tasks.v1.TaskDetail.created_at:type_name -> google.protobuf.Timestamp
+	30, // 9: elpulpo.tasks.v1.TaskDetail.updated_at:type_name -> google.protobuf.Timestamp
+	30, // 10: elpulpo.tasks.v1.CreateTaskRequest.scheduled_for:type_name -> google.protobuf.Timestamp
 	12, // 11: elpulpo.tasks.v1.CreateTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
 	12, // 12: elpulpo.tasks.v1.GetTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
 	12, // 13: elpulpo.tasks.v1.ListTasksResponse.items:type_name -> elpulpo.tasks.v1.TaskDetail
 	11, // 14: elpulpo.tasks.v1.ListTaskLogsResponse.items:type_name -> elpulpo.tasks.v1.TaskLogEntry
-	1,  // 15: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
-	3,  // 16: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
-	5,  // 17: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
-	7,  // 18: elpulpo.tasks.v1.TaskService.UpdateProgress:input_type -> elpulpo.tasks.v1.UpdateProgressRequest
-	9,  // 19: elpulpo.tasks.v1.TaskService.AppendLog:input_type -> elpulpo.tasks.v1.AppendLogRequest
-	13, // 20: elpulpo.tasks.v1.AdminService.CreateTask:input_type -> elpulpo.tasks.v1.CreateTaskRequest
-	15, // 21: elpulpo.tasks.v1.AdminService.GetTask:input_type -> elpulpo.tasks.v1.GetTaskRequest
-	17, // 22: elpulpo.tasks.v1.AdminService.ListTasks:input_type -> elpulpo.tasks.v1.ListTasksRequest
-	19, // 23: elpulpo.tasks.v1.AdminService.ListTaskLogs:input_type -> elpulpo.tasks.v1.ListTaskLogsRequest
-	2,  // 24: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
-	4,  // 25: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
-	6,  // 26: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
-	8,  // 27: elpulpo.tasks.v1.TaskService.UpdateProgress:output_type -> elpulpo.tasks.v1.UpdateProgressResponse
-	10, // 28: elpulpo.tasks.v1.TaskService.AppendLog:output_type -> elpulpo.tasks.v1.AppendLogResponse
-	14, // 29: elpulpo.tasks.v1.AdminService.CreateTask:output_type -> elpulpo.tasks.v1.CreateTaskResponse
-	16, // 30: elpulpo.tasks.v1.AdminService.GetTask:output_type -> elpulpo.tasks.v1.GetTaskResponse
-	18, // 31: elpulpo.tasks.v1.AdminService.ListTasks:output_type -> elpulpo.tasks.v1.ListTasksResponse
-	20, // 32: elpulpo.tasks.v1.AdminService.ListTaskLogs:output_type -> elpulpo.tasks.v1.ListTaskLogsResponse
-	24, // [24:33] is the sub-list for method output_type
-	15, // [15:24] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	12, // 15: elpulpo.tasks.v1.RetryTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
+	30, // 16: elpulpo.tasks.v1.WorkerInfo.last_seen_at:type_name -> google.protobuf.Timestamp
+	25, // 17: elpulpo.tasks.v1.ListWorkersResponse.items:type_name -> elpulpo.tasks.v1.WorkerInfo
+	1,  // 18: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
+	3,  // 19: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
+	5,  // 20: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
+	7,  // 21: elpulpo.tasks.v1.TaskService.UpdateProgress:input_type -> elpulpo.tasks.v1.UpdateProgressRequest
+	9,  // 22: elpulpo.tasks.v1.TaskService.AppendLog:input_type -> elpulpo.tasks.v1.AppendLogRequest
+	13, // 23: elpulpo.tasks.v1.AdminService.CreateTask:input_type -> elpulpo.tasks.v1.CreateTaskRequest
+	15, // 24: elpulpo.tasks.v1.AdminService.GetTask:input_type -> elpulpo.tasks.v1.GetTaskRequest
+	17, // 25: elpulpo.tasks.v1.AdminService.ListTasks:input_type -> elpulpo.tasks.v1.ListTasksRequest
+	19, // 26: elpulpo.tasks.v1.AdminService.ListTaskLogs:input_type -> elpulpo.tasks.v1.ListTaskLogsRequest
+	21, // 27: elpulpo.tasks.v1.AdminService.CancelTask:input_type -> elpulpo.tasks.v1.CancelTaskRequest
+	23, // 28: elpulpo.tasks.v1.AdminService.RetryTask:input_type -> elpulpo.tasks.v1.RetryTaskRequest
+	26, // 29: elpulpo.tasks.v1.AdminService.ListWorkers:input_type -> elpulpo.tasks.v1.ListWorkersRequest
+	2,  // 30: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
+	4,  // 31: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
+	6,  // 32: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
+	8,  // 33: elpulpo.tasks.v1.TaskService.UpdateProgress:output_type -> elpulpo.tasks.v1.UpdateProgressResponse
+	10, // 34: elpulpo.tasks.v1.TaskService.AppendLog:output_type -> elpulpo.tasks.v1.AppendLogResponse
+	14, // 35: elpulpo.tasks.v1.AdminService.CreateTask:output_type -> elpulpo.tasks.v1.CreateTaskResponse
+	16, // 36: elpulpo.tasks.v1.AdminService.GetTask:output_type -> elpulpo.tasks.v1.GetTaskResponse
+	18, // 37: elpulpo.tasks.v1.AdminService.ListTasks:output_type -> elpulpo.tasks.v1.ListTasksResponse
+	20, // 38: elpulpo.tasks.v1.AdminService.ListTaskLogs:output_type -> elpulpo.tasks.v1.ListTaskLogsResponse
+	22, // 39: elpulpo.tasks.v1.AdminService.CancelTask:output_type -> elpulpo.tasks.v1.CancelTaskResponse
+	24, // 40: elpulpo.tasks.v1.AdminService.RetryTask:output_type -> elpulpo.tasks.v1.RetryTaskResponse
+	27, // 41: elpulpo.tasks.v1.AdminService.ListWorkers:output_type -> elpulpo.tasks.v1.ListWorkersResponse
+	30, // [30:42] is the sub-list for method output_type
+	18, // [18:30] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_internal_proto_tasks_proto_init() }
@@ -1580,7 +1953,7 @@ func file_internal_proto_tasks_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_tasks_proto_rawDesc), len(file_internal_proto_tasks_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   23,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

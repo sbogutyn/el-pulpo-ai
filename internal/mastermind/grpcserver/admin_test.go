@@ -45,6 +45,9 @@ func startAdminBufServer(t *testing.T) (pb.AdminServiceClient, pb.TaskServiceCli
 		"/elpulpo.tasks.v1.AdminService/GetTask":       testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListTasks":     testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListTaskLogs":  testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/CancelTask":    testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/RetryTask":     testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListWorkers":   testAdminToken,
 	}
 
 	lis := bufconn.Listen(1 << 20)

@@ -70,6 +70,9 @@ func run() error {
 		"/elpulpo.tasks.v1.AdminService/GetTask":       cfg.AdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListTasks":     cfg.AdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListTaskLogs":  cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/CancelTask":    cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/RetryTask":     cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListWorkers":   cfg.AdminToken,
 	}
 	gs := grpc.NewServer(grpc.UnaryInterceptor(auth.PerMethodInterceptor(policy)))
 	pb.RegisterTaskServiceServer(gs, grpcserver.New(s))

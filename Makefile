@@ -26,7 +26,7 @@ DOCKER_BUILD_ARGS = \
 	--build-arg BUILD_DATE=$(BUILD_DATE)
 
 .PHONY: dev-up dev-down migrate-up migrate-down migrate-new \
-        proto run-mastermind run-worker run-mcp test tidy build build-mcp \
+        proto run-mastermind run-worker run-mcp run-cli test tidy build build-mcp build-cli \
         docker-build docker-build-mastermind docker-build-worker docker-build-mcp \
         docker-buildx docker-buildx-mastermind docker-buildx-worker docker-buildx-mcp \
         docker-push docker-push-mastermind docker-push-worker docker-push-mcp \
@@ -81,9 +81,18 @@ build:
 	CGO_ENABLED=0 go build -o bin/mastermind ./cmd/mastermind
 	CGO_ENABLED=0 go build -o bin/worker ./cmd/worker
 	CGO_ENABLED=0 go build -o bin/mastermind-mcp ./cmd/mastermind-mcp
+	CGO_ENABLED=0 go build -o bin/elpulpo ./cmd/elpulpo
 
 build-mcp:
 	CGO_ENABLED=0 go build -o bin/mastermind-mcp ./cmd/mastermind-mcp
+
+build-cli:
+	CGO_ENABLED=0 go build -o bin/elpulpo ./cmd/elpulpo
+
+run-cli:
+	MASTERMIND_ADDR=localhost:50051 \
+	ADMIN_TOKEN=devtoken \
+	go run ./cmd/elpulpo $(ARGS)
 
 # --- Docker targets ---------------------------------------------------------
 
