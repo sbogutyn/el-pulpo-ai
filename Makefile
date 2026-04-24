@@ -18,6 +18,7 @@ image_ref = $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY)/,)$(DOCKER_NAMESPACE)/el-
 
 MASTERMIND_IMAGE ?= $(call image_ref,mastermind)
 WORKER_IMAGE     ?= $(call image_ref,worker)
+MCP_IMAGE        ?= $(call image_ref,mastermind-mcp)
 
 DOCKER_BUILD_ARGS = \
 	--build-arg VERSION=$(VERSION) \
@@ -26,10 +27,10 @@ DOCKER_BUILD_ARGS = \
 
 .PHONY: dev-up dev-down migrate-up migrate-down migrate-new \
         proto run-mastermind run-worker run-mcp test tidy build build-mcp \
-        docker-build docker-build-mastermind docker-build-worker \
-        docker-buildx docker-buildx-mastermind docker-buildx-worker \
-        docker-push docker-push-mastermind docker-push-worker \
-        docker-run-mastermind docker-run-worker docker-clean
+        docker-build docker-build-mastermind docker-build-worker docker-build-mcp \
+        docker-buildx docker-buildx-mastermind docker-buildx-worker docker-buildx-mcp \
+        docker-push docker-push-mastermind docker-push-worker docker-push-mcp \
+        docker-run-mastermind docker-run-worker docker-run-mcp docker-clean
 
 dev-up:
 	docker compose up -d
@@ -86,7 +87,7 @@ build-mcp:
 
 # --- Docker targets ---------------------------------------------------------
 
-docker-build: docker-build-mastermind docker-build-worker
+docker-build: docker-build-mastermind docker-build-worker docker-build-mcp
 
 docker-build-mastermind:
 	$(DOCKER_BUILDKIT_EXPORT) $(DOCKER) build \
@@ -104,7 +105,15 @@ docker-build-worker:
 		$(DOCKER_BUILD_ARGS) \
 		.
 
-docker-buildx: docker-buildx-mastermind docker-buildx-worker
+docker-build-mcp:
+	$(DOCKER_BUILDKIT_EXPORT) $(DOCKER) build \
+		-f Dockerfile.mcp \
+		-t $(MCP_IMAGE):$(VERSION) \
+		-t $(MCP_IMAGE):latest \
+		$(DOCKER_BUILD_ARGS) \
+		.
+
+docker-buildx: docker-buildx-mastermind docker-buildx-worker docker-buildx-mcp
 
 docker-buildx-mastermind:
 	$(DOCKER) buildx build \
@@ -126,7 +135,17 @@ docker-buildx-worker:
 		$(if $(PUSH),--push,--load) \
 		.
 
-docker-push: docker-push-mastermind docker-push-worker
+docker-buildx-mcp:
+	$(DOCKER) buildx build \
+		--platform $(PLATFORMS) \
+		-f Dockerfile.mcp \
+		-t $(MCP_IMAGE):$(VERSION) \
+		-t $(MCP_IMAGE):latest \
+		$(DOCKER_BUILD_ARGS) \
+		$(if $(PUSH),--push,--load) \
+		.
+
+docker-push: docker-push-mastermind docker-push-worker docker-push-mcp
 
 docker-push-mastermind:
 	$(DOCKER) push $(MASTERMIND_IMAGE):$(VERSION)
@@ -135,6 +154,10 @@ docker-push-mastermind:
 docker-push-worker:
 	$(DOCKER) push $(WORKER_IMAGE):$(VERSION)
 	$(DOCKER) push $(WORKER_IMAGE):latest
+
+docker-push-mcp:
+	$(DOCKER) push $(MCP_IMAGE):$(VERSION)
+	$(DOCKER) push $(MCP_IMAGE):latest
 
 docker-run-mastermind:
 	$(DOCKER) run --rm --name mastermind \
@@ -147,6 +170,12 @@ docker-run-worker:
 		--env-file .env \
 		$(WORKER_IMAGE):$(VERSION)
 
+docker-run-mcp:
+	$(DOCKER) run --rm -i --name mastermind-mcp \
+		--env-file .env \
+		$(MCP_IMAGE):$(VERSION)
+
 docker-clean:
 	-$(DOCKER) rmi $(MASTERMIND_IMAGE):$(VERSION) $(MASTERMIND_IMAGE):latest 2>/dev/null
 	-$(DOCKER) rmi $(WORKER_IMAGE):$(VERSION) $(WORKER_IMAGE):latest 2>/dev/null
+	-$(DOCKER) rmi $(MCP_IMAGE):$(VERSION) $(MCP_IMAGE):latest 2>/dev/null
