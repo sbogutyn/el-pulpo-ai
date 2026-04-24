@@ -59,6 +59,30 @@ func (s *Server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.H
 	return &pb.HeartbeatResponse{}, nil
 }
 
+func (s *Server) AppendLog(ctx context.Context, req *pb.AppendLogRequest) (*pb.AppendLogResponse, error) {
+	if req.GetWorkerId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
+	}
+	if req.GetMessage() == "" {
+		return nil, status.Error(codes.InvalidArgument, "message is required")
+	}
+	id, err := uuid.Parse(req.GetTaskId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "task_id must be a UUID")
+	}
+	entry, err := s.store.AppendTaskLog(ctx, req.GetWorkerId(), id, req.GetMessage())
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "task %s not found", id)
+		}
+		if errors.Is(err, store.ErrNotOwner) {
+			return nil, status.Error(codes.FailedPrecondition, "not the current owner of this task")
+		}
+		return nil, status.Errorf(codes.Internal, "append_log: %v", err)
+	}
+	return &pb.AppendLogResponse{Id: entry.ID}, nil
+}
+
 func (s *Server) UpdateProgress(ctx context.Context, req *pb.UpdateProgressRequest) (*pb.UpdateProgressResponse, error) {
 	if req.GetWorkerId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "worker_id is required")

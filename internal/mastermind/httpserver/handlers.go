@@ -43,6 +43,7 @@ type formPageData struct {
 type detailPageData struct {
 	Title string
 	Task  store.Task
+	Logs  []store.TaskLogEntry
 	Error string
 }
 
@@ -175,7 +176,11 @@ func (s *Server) tasksDetail(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task}); err != nil {
+	logs, err := s.store.ListTaskLogs(r.Context(), id, 500)
+	if err != nil {
+		s.log.Warn("list task logs", "error", err, "task_id", id)
+	}
+	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Logs: logs}); err != nil {
 		s.log.Error("render tasks_detail", "error", err)
 		http.Error(w, "render error", http.StatusInternalServerError)
 	}
@@ -274,8 +279,12 @@ func (s *Server) renderDetailError(w http.ResponseWriter, r *http.Request, id uu
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	logs, listErr := s.store.ListTaskLogs(r.Context(), id, 500)
+	if listErr != nil {
+		s.log.Warn("list task logs", "error", listErr, "task_id", id)
+	}
 	w.WriteHeader(code)
-	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Error: msg}); err != nil {
+	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Logs: logs, Error: msg}); err != nil {
 		s.log.Error("render tasks_detail", "error", err)
 	}
 }

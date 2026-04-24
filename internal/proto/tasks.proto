@@ -34,6 +34,13 @@ service TaskService {
   // see what a long-running worker is doing. Returns FAILED_PRECONDITION
   // when the caller no longer owns the claim.
   rpc UpdateProgress(UpdateProgressRequest) returns (UpdateProgressResponse);
+
+  // AppendLog adds a single immutable log line to the task's append-only
+  // log and refreshes the caller's lease. Unlike UpdateProgress (which
+  // overwrites a single "current status" note), AppendLog is used to
+  // record a narrative trail of what the worker did. Returns
+  // FAILED_PRECONDITION when the caller no longer owns the claim.
+  rpc AppendLog(AppendLogRequest) returns (AppendLogResponse);
 }
 
 // Task is the unit of work handed from mastermind to a worker.
@@ -111,6 +118,27 @@ message UpdateProgressRequest {
 
 message UpdateProgressResponse {}
 
+// AppendLogRequest appends one line to the task's immutable log.
+message AppendLogRequest {
+  string worker_id = 1;
+  string task_id   = 2;
+  string message   = 3;
+}
+
+message AppendLogResponse {
+  // id of the freshly inserted log row; useful for tests and downstream
+  // correlation.
+  int64 id = 1;
+}
+
+// TaskLogEntry mirrors one row of the `task_logs` table.
+message TaskLogEntry {
+  int64  id                              = 1;
+  string task_id                         = 2;
+  string message                         = 3;
+  google.protobuf.Timestamp created_at   = 4;
+}
+
 // AdminService is the administrative surface of mastermind. It is consumed by
 // the mastermind-mcp binary (on behalf of a coding agent) and any future admin
 // tooling. Authentication uses ADMIN_TOKEN, enforced by the server's
@@ -124,6 +152,10 @@ service AdminService {
 
   // ListTasks returns a page of tasks, optionally filtered by status.
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+
+  // ListTaskLogs returns the append-only log lines recorded for a task
+  // (oldest first, capped by `limit`). NOT_FOUND when the id is unknown.
+  rpc ListTaskLogs(ListTaskLogsRequest) returns (ListTaskLogsResponse);
 }
 
 // TaskDetail mirrors the mastermind `tasks` row. Nullable columns become empty
@@ -171,4 +203,13 @@ message ListTasksRequest {
 message ListTasksResponse {
   repeated TaskDetail items = 1;
   int32             total   = 2;
+}
+
+message ListTaskLogsRequest {
+  string id    = 1;
+  int32  limit = 2;
+}
+
+message ListTaskLogsResponse {
+  repeated TaskLogEntry items = 1;
 }

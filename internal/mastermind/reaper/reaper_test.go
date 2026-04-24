@@ -17,7 +17,7 @@ func TestReaper_ReclaimsStaleTasks(t *testing.T) {
 		t.Fatalf("store.Open: %v", err)
 	}
 	defer s.Close()
-	if _, err := s.Pool().Exec(ctx, "TRUNCATE TABLE tasks"); err != nil {
+	if _, err := s.Pool().Exec(ctx, "TRUNCATE TABLE tasks CASCADE"); err != nil {
 		t.Fatalf("TRUNCATE: %v", err)
 	}
 

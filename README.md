@@ -1,6 +1,6 @@
 # el-pulpo-ai
 
-Distributed task queue. Single **mastermind** (gRPC + HTMX admin UI, Postgres-backed) and horizontally-scalable **workers**.
+Distributed task queue. Single **mastermind** (gRPC + HTMX admin UI, Postgres-backed) and horizontally-scalable **workers** that bridge the queue to an on-host coding agent over MCP.
 
 Design: [`docs/superpowers/specs/2026-04-23-mastermind-worker-task-queue-design.md`](docs/superpowers/specs/2026-04-23-mastermind-worker-task-queue-design.md)
 
@@ -41,6 +41,41 @@ MASTERMIND_ADDR=localhost:50051 \
 WORKER_TOKEN=devtoken \
 go run ./cmd/worker
 ```
+
+The worker does not execute task logic directly. It connects to mastermind over
+gRPC and serves a local MCP endpoint (default `http://127.0.0.1:7777/mcp`) that
+a coding agent on the same machine uses to drive one task at a time.
+
+## Worker MCP (coding agent integration)
+
+Point a local coding agent at the worker's MCP endpoint and it will see these
+tools:
+
+| Tool | Purpose |
+| ---- | ------- |
+| `claim_next_task` | Claim the next task from mastermind (idempotent while already holding one). |
+| `get_current_task` | Return details of the task the worker is currently holding. |
+| `update_progress` | Set the short "current status" note surfaced on the admin UI. |
+| `append_log` | Append one immutable line to the task's log. |
+| `complete_task` | Mark the task successful and release the claim. |
+| `fail_task` | Mark the task failed with a message; mastermind retries or terminates per policy. |
+
+Example `.mcp.json` for a worker running on `127.0.0.1:7777`:
+
+```json
+{
+  "mcpServers": {
+    "el-pulpo-worker": {
+      "type": "http",
+      "url": "http://127.0.0.1:7777/mcp"
+    }
+  }
+}
+```
+
+The worker binds to loopback by default and benefits from the MCP SDK's
+DNS-rebinding protection — override with `WORKER_MCP_LISTEN_ADDR` if needed,
+but do not bind publicly without adding transport-level auth.
 
 ## Admin UI
 

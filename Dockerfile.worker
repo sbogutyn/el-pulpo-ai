@@ -38,5 +38,6 @@ LABEL org.opencontainers.image.title="el-pulpo-worker" \
 
 WORKDIR /app
 COPY --from=build /out/worker /app/worker
+EXPOSE 7777
 USER nonroot:nonroot
 ENTRYPOINT ["/app/worker"]

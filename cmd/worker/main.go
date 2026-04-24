@@ -1,4 +1,8 @@
-// Command worker connects to the mastermind over gRPC and processes tasks.
+// Command worker connects to the mastermind over gRPC and serves a local
+// MCP endpoint. A coding agent running on the same machine uses the MCP
+// tools to claim the next task, update progress and logs, and mark the
+// task complete or failed. The worker itself does not execute task logic —
+// it is a thin bridge between mastermind and the on-host agent.
 package main
 
 import (
@@ -7,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -16,7 +19,8 @@ import (
 	"github.com/sbogutyn/el-pulpo-ai/internal/auth"
 	"github.com/sbogutyn/el-pulpo-ai/internal/config"
 	pb "github.com/sbogutyn/el-pulpo-ai/internal/proto"
-	"github.com/sbogutyn/el-pulpo-ai/internal/worker/runner"
+	"github.com/sbogutyn/el-pulpo-ai/internal/worker/mcpserver"
+	"github.com/sbogutyn/el-pulpo-ai/internal/worker/taskclient"
 )
 
 func main() {
@@ -47,18 +51,18 @@ func run() error {
 
 	id := uuid.New().String()
 	log = log.With("worker_id", id)
-	log.Info("starting", "mastermind_addr", cfg.MastermindAddr)
+	log.Info("starting",
+		"mastermind_addr", cfg.MastermindAddr,
+		"mcp_listen_addr", cfg.MCPListenAddr,
+	)
 
-	r := runner.New(pb.NewTaskServiceClient(conn), runner.Config{
-		WorkerID:          id,
-		PollInterval:      cfg.PollInterval,
-		HeartbeatInterval: cfg.HeartbeatInterval,
-		WorkDuration:      time.Minute,
-	}, log)
+	client := taskclient.NewClient(pb.NewTaskServiceClient(conn), id)
+	state := mcpserver.New(client, cfg.HeartbeatInterval, log)
+	defer state.Release()
 
-	r.Run(ctx)
+	err = mcpserver.Serve(ctx, state, mcpserver.HTTPConfig{Addr: cfg.MCPListenAddr}, log)
 	log.Info("stopped")
-	return nil
+	return err
 }
 
 func newLogger(level, format string) *slog.Logger {

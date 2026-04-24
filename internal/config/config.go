@@ -27,8 +27,13 @@ type Worker struct {
 	WorkerToken       string        `envconfig:"WORKER_TOKEN" required:"true"`
 	PollInterval      time.Duration `envconfig:"POLL_INTERVAL" default:"2s"`
 	HeartbeatInterval time.Duration `envconfig:"HEARTBEAT_INTERVAL" default:"10s"`
-	LogLevel          string        `envconfig:"LOG_LEVEL" default:"info"`
-	LogFormat         string        `envconfig:"LOG_FORMAT" default:"json"`
+	// MCPListenAddr is the address the worker's local MCP HTTP server binds
+	// to. The coding agent running on the same machine connects here to
+	// claim tasks, record progress, and finalize work. Keep this on
+	// loopback so DNS-rebinding protection applies.
+	MCPListenAddr string `envconfig:"WORKER_MCP_LISTEN_ADDR" default:"127.0.0.1:7777"`
+	LogLevel      string `envconfig:"LOG_LEVEL" default:"info"`
+	LogFormat     string `envconfig:"LOG_FORMAT" default:"json"`
 }
 
 func LoadMastermind() (Mastermind, error) {

@@ -23,6 +23,7 @@ const (
 	TaskService_Heartbeat_FullMethodName      = "/elpulpo.tasks.v1.TaskService/Heartbeat"
 	TaskService_ReportResult_FullMethodName   = "/elpulpo.tasks.v1.TaskService/ReportResult"
 	TaskService_UpdateProgress_FullMethodName = "/elpulpo.tasks.v1.TaskService/UpdateProgress"
+	TaskService_AppendLog_FullMethodName      = "/elpulpo.tasks.v1.TaskService/AppendLog"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -54,6 +55,12 @@ type TaskServiceClient interface {
 	// see what a long-running worker is doing. Returns FAILED_PRECONDITION
 	// when the caller no longer owns the claim.
 	UpdateProgress(ctx context.Context, in *UpdateProgressRequest, opts ...grpc.CallOption) (*UpdateProgressResponse, error)
+	// AppendLog adds a single immutable log line to the task's append-only
+	// log and refreshes the caller's lease. Unlike UpdateProgress (which
+	// overwrites a single "current status" note), AppendLog is used to
+	// record a narrative trail of what the worker did. Returns
+	// FAILED_PRECONDITION when the caller no longer owns the claim.
+	AppendLog(ctx context.Context, in *AppendLogRequest, opts ...grpc.CallOption) (*AppendLogResponse, error)
 }
 
 type taskServiceClient struct {
@@ -104,6 +111,16 @@ func (c *taskServiceClient) UpdateProgress(ctx context.Context, in *UpdateProgre
 	return out, nil
 }
 
+func (c *taskServiceClient) AppendLog(ctx context.Context, in *AppendLogRequest, opts ...grpc.CallOption) (*AppendLogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AppendLogResponse)
+	err := c.cc.Invoke(ctx, TaskService_AppendLog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -133,6 +150,12 @@ type TaskServiceServer interface {
 	// see what a long-running worker is doing. Returns FAILED_PRECONDITION
 	// when the caller no longer owns the claim.
 	UpdateProgress(context.Context, *UpdateProgressRequest) (*UpdateProgressResponse, error)
+	// AppendLog adds a single immutable log line to the task's append-only
+	// log and refreshes the caller's lease. Unlike UpdateProgress (which
+	// overwrites a single "current status" note), AppendLog is used to
+	// record a narrative trail of what the worker did. Returns
+	// FAILED_PRECONDITION when the caller no longer owns the claim.
+	AppendLog(context.Context, *AppendLogRequest) (*AppendLogResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -154,6 +177,9 @@ func (UnimplementedTaskServiceServer) ReportResult(context.Context, *ReportResul
 }
 func (UnimplementedTaskServiceServer) UpdateProgress(context.Context, *UpdateProgressRequest) (*UpdateProgressResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateProgress not implemented")
+}
+func (UnimplementedTaskServiceServer) AppendLog(context.Context, *AppendLogRequest) (*AppendLogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AppendLog not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -248,6 +274,24 @@ func _TaskService_UpdateProgress_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_AppendLog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppendLogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).AppendLog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_AppendLog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).AppendLog(ctx, req.(*AppendLogRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -271,15 +315,20 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "UpdateProgress",
 			Handler:    _TaskService_UpdateProgress_Handler,
 		},
+		{
+			MethodName: "AppendLog",
+			Handler:    _TaskService_AppendLog_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "internal/proto/tasks.proto",
 }
 
 const (
-	AdminService_CreateTask_FullMethodName = "/elpulpo.tasks.v1.AdminService/CreateTask"
-	AdminService_GetTask_FullMethodName    = "/elpulpo.tasks.v1.AdminService/GetTask"
-	AdminService_ListTasks_FullMethodName  = "/elpulpo.tasks.v1.AdminService/ListTasks"
+	AdminService_CreateTask_FullMethodName   = "/elpulpo.tasks.v1.AdminService/CreateTask"
+	AdminService_GetTask_FullMethodName      = "/elpulpo.tasks.v1.AdminService/GetTask"
+	AdminService_ListTasks_FullMethodName    = "/elpulpo.tasks.v1.AdminService/ListTasks"
+	AdminService_ListTaskLogs_FullMethodName = "/elpulpo.tasks.v1.AdminService/ListTaskLogs"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -297,6 +346,9 @@ type AdminServiceClient interface {
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
 	// ListTasks returns a page of tasks, optionally filtered by status.
 	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+	// ListTaskLogs returns the append-only log lines recorded for a task
+	// (oldest first, capped by `limit`). NOT_FOUND when the id is unknown.
+	ListTaskLogs(ctx context.Context, in *ListTaskLogsRequest, opts ...grpc.CallOption) (*ListTaskLogsResponse, error)
 }
 
 type adminServiceClient struct {
@@ -337,6 +389,16 @@ func (c *adminServiceClient) ListTasks(ctx context.Context, in *ListTasksRequest
 	return out, nil
 }
 
+func (c *adminServiceClient) ListTaskLogs(ctx context.Context, in *ListTaskLogsRequest, opts ...grpc.CallOption) (*ListTaskLogsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTaskLogsResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListTaskLogs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AdminServiceServer is the server API for AdminService service.
 // All implementations must embed UnimplementedAdminServiceServer
 // for forward compatibility.
@@ -352,6 +414,9 @@ type AdminServiceServer interface {
 	GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error)
 	// ListTasks returns a page of tasks, optionally filtered by status.
 	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	// ListTaskLogs returns the append-only log lines recorded for a task
+	// (oldest first, capped by `limit`). NOT_FOUND when the id is unknown.
+	ListTaskLogs(context.Context, *ListTaskLogsRequest) (*ListTaskLogsResponse, error)
 	mustEmbedUnimplementedAdminServiceServer()
 }
 
@@ -370,6 +435,9 @@ func (UnimplementedAdminServiceServer) GetTask(context.Context, *GetTaskRequest)
 }
 func (UnimplementedAdminServiceServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTasks not implemented")
+}
+func (UnimplementedAdminServiceServer) ListTaskLogs(context.Context, *ListTaskLogsRequest) (*ListTaskLogsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTaskLogs not implemented")
 }
 func (UnimplementedAdminServiceServer) mustEmbedUnimplementedAdminServiceServer() {}
 func (UnimplementedAdminServiceServer) testEmbeddedByValue()                      {}
@@ -446,6 +514,24 @@ func _AdminService_ListTasks_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_ListTaskLogs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTaskLogsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListTaskLogs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListTaskLogs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListTaskLogs(ctx, req.(*ListTaskLogsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -464,6 +550,10 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTasks",
 			Handler:    _AdminService_ListTasks_Handler,
+		},
+		{
+			MethodName: "ListTaskLogs",
+			Handler:    _AdminService_ListTaskLogs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
