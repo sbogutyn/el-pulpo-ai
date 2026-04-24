@@ -17,7 +17,12 @@ make run-worker     # run a worker locally
 
 ```bash
 make test           # unit + integration tests (uses testcontainers)
+make test-e2e       # end-to-end tests against the full docker-compose stack
 ```
+
+The end-to-end suite is documented in [`e2e/README.md`](e2e/README.md) and
+designed in
+[`docs/superpowers/specs/2026-04-24-e2e-testing-design.md`](docs/superpowers/specs/2026-04-24-e2e-testing-design.md).
 
 ## Configuration
 

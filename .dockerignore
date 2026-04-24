@@ -23,3 +23,7 @@ Makefile
 
 coverage.out
 *.test
+
+# End-to-end test artifacts — irrelevant to the production images.
+/e2e/.bin/
+/docker-compose.e2e.yml
