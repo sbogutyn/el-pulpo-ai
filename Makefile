@@ -26,7 +26,8 @@ DOCKER_BUILD_ARGS = \
 	--build-arg BUILD_DATE=$(BUILD_DATE)
 
 .PHONY: dev-up dev-down migrate-up migrate-down migrate-new \
-        proto run-mastermind run-worker run-mcp test tidy build build-mcp \
+        proto run-mastermind run-worker run-mcp test test-e2e test-e2e-keep \
+        e2e-down tidy build build-mcp \
         docker-build docker-build-mastermind docker-build-worker docker-build-mcp \
         docker-buildx docker-buildx-mastermind docker-buildx-worker docker-buildx-mcp \
         docker-push docker-push-mastermind docker-push-worker docker-push-mcp \
@@ -73,6 +74,20 @@ run-mcp:
 
 test:
 	go test ./... -race -count=1
+
+# End-to-end suite — brings up docker-compose.e2e.yml, runs every test under
+# the `e2e` build tag, then tears the stack down. See e2e/README.md.
+test-e2e:
+	go test -tags=e2e -timeout=15m ./e2e/...
+
+# Same as test-e2e but leaves the stack running on exit so a developer can
+# poke at it (docker compose ps, curl, etc.). Use `make e2e-down` to clean up.
+test-e2e-keep:
+	E2E_KEEP=1 go test -tags=e2e -timeout=15m ./e2e/...
+
+# Tear down an e2e stack left running by `make test-e2e-keep`.
+e2e-down:
+	docker compose -f docker-compose.e2e.yml down -v
 
 tidy:
 	go mod tidy
