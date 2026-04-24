@@ -109,3 +109,57 @@ func TestCreateTaskTool_MissingName_ToolError(t *testing.T) {
 		t.Fatal("expected IsError=true for missing name")
 	}
 }
+
+func TestGetTaskTool_Happy(t *testing.T) {
+	admin, _ := startAdminBuf(t)
+	session := startMCPClient(t, admin)
+
+	created, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "create_task",
+		Arguments: map[string]any{"name": "x"},
+	})
+	if err != nil || created.IsError {
+		t.Fatalf("seed CreateTask: %v %+v", err, created)
+	}
+	raw, _ := json.Marshal(created.StructuredContent)
+	var seed struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(raw, &seed)
+
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "get_task",
+		Arguments: map[string]any{"id": seed.ID},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("tool error: %+v", res.Content)
+	}
+	raw2, _ := json.Marshal(res.StructuredContent)
+	var out struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	_ = json.Unmarshal(raw2, &out)
+	if out.ID != seed.ID || out.Name != "x" {
+		t.Errorf("got id=%q name=%q, want id=%q name=x", out.ID, out.Name, seed.ID)
+	}
+}
+
+func TestGetTaskTool_NotFound_ToolError(t *testing.T) {
+	admin, _ := startAdminBuf(t)
+	session := startMCPClient(t, admin)
+
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "get_task",
+		Arguments: map[string]any{"id": "00000000-0000-0000-0000-000000000000"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("want IsError=true for missing id")
+	}
+}

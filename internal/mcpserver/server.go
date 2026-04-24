@@ -11,5 +11,6 @@ import (
 func NewServer(admin pb.AdminServiceClient) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "mastermind-mcp", Version: "v1.0.0"}, nil)
 	registerCreateTask(s, admin)
+	registerGetTask(s, admin)
 	return s
 }

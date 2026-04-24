@@ -131,6 +131,28 @@ func registerCreateTask(s *mcp.Server, admin pb.AdminServiceClient) {
 	})
 }
 
+type GetTaskInput struct {
+	ID string `json:"id" jsonschema:"task id (UUID)"`
+}
+
+func registerGetTask(s *mcp.Server, admin pb.AdminServiceClient) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "get_task",
+		Description: "Fetch one task by id. Returns an error if the id is unknown.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in GetTaskInput) (*mcp.CallToolResult, TaskDetail, error) {
+		resp, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: in.ID})
+		if err != nil {
+			return toolErr(err, "get_task"), TaskDetail{}, nil
+		}
+		d := fromProtoTask(resp.GetTask())
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{
+				Text: fmt.Sprintf("%s — %s", d.ID, d.Status),
+			}},
+		}, d, nil
+	})
+}
+
 // toolErr converts a gRPC error from mastermind into an MCP tool error.
 // We always return tool errors (IsError=true) rather than protocol errors —
 // the MCP server itself should never fail a call just because an RPC didn't.
