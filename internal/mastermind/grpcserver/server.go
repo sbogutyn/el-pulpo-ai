@@ -59,6 +59,23 @@ func (s *Server) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.H
 	return &pb.HeartbeatResponse{}, nil
 }
 
+func (s *Server) UpdateProgress(ctx context.Context, req *pb.UpdateProgressRequest) (*pb.UpdateProgressResponse, error) {
+	if req.GetWorkerId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
+	}
+	id, err := uuid.Parse(req.GetTaskId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "task_id must be a UUID")
+	}
+	if err := s.store.UpdateProgress(ctx, req.GetWorkerId(), id, req.GetNote()); err != nil {
+		if errors.Is(err, store.ErrNotOwner) {
+			return nil, status.Error(codes.FailedPrecondition, "not the current owner of this task")
+		}
+		return nil, status.Errorf(codes.Internal, "update_progress: %v", err)
+	}
+	return &pb.UpdateProgressResponse{}, nil
+}
+
 func (s *Server) ReportResult(ctx context.Context, req *pb.ReportResultRequest) (*pb.ReportResultResponse, error) {
 	id, err := uuid.Parse(req.GetTaskId())
 	if err != nil {

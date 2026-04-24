@@ -27,6 +27,13 @@ service TaskService {
   // the task to `failed` once `max_attempts` is exhausted. Returns
   // FAILED_PRECONDITION when the caller no longer owns the claim.
   rpc ReportResult(ReportResultRequest) returns (ReportResultResponse);
+
+  // UpdateProgress attaches a free-form progress note to a task the caller
+  // owns and refreshes its lease (same effect as Heartbeat). The note is
+  // overwritten on each call and surfaced in the admin UI so operators can
+  // see what a long-running worker is doing. Returns FAILED_PRECONDITION
+  // when the caller no longer owns the claim.
+  rpc UpdateProgress(UpdateProgressRequest) returns (UpdateProgressResponse);
 }
 
 // Task is the unit of work handed from mastermind to a worker.
@@ -93,6 +100,16 @@ message ReportResultRequest {
 }
 
 message ReportResultResponse {}
+
+// UpdateProgressRequest records a free-form progress note. An empty `note`
+// clears any previously stored note on the task.
+message UpdateProgressRequest {
+  string worker_id = 1;
+  string task_id = 2;
+  string note = 3;
+}
+
+message UpdateProgressResponse {}
 
 // AdminService is the administrative surface of mastermind. It is consumed by
 // the mastermind-mcp binary (on behalf of a coding agent) and any future admin

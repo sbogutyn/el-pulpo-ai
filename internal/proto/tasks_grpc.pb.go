@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TaskService_ClaimTask_FullMethodName    = "/elpulpo.tasks.v1.TaskService/ClaimTask"
-	TaskService_Heartbeat_FullMethodName    = "/elpulpo.tasks.v1.TaskService/Heartbeat"
-	TaskService_ReportResult_FullMethodName = "/elpulpo.tasks.v1.TaskService/ReportResult"
+	TaskService_ClaimTask_FullMethodName      = "/elpulpo.tasks.v1.TaskService/ClaimTask"
+	TaskService_Heartbeat_FullMethodName      = "/elpulpo.tasks.v1.TaskService/Heartbeat"
+	TaskService_ReportResult_FullMethodName   = "/elpulpo.tasks.v1.TaskService/ReportResult"
+	TaskService_UpdateProgress_FullMethodName = "/elpulpo.tasks.v1.TaskService/UpdateProgress"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -47,6 +48,12 @@ type TaskServiceClient interface {
 	// the task to `failed` once `max_attempts` is exhausted. Returns
 	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	ReportResult(ctx context.Context, in *ReportResultRequest, opts ...grpc.CallOption) (*ReportResultResponse, error)
+	// UpdateProgress attaches a free-form progress note to a task the caller
+	// owns and refreshes its lease (same effect as Heartbeat). The note is
+	// overwritten on each call and surfaced in the admin UI so operators can
+	// see what a long-running worker is doing. Returns FAILED_PRECONDITION
+	// when the caller no longer owns the claim.
+	UpdateProgress(ctx context.Context, in *UpdateProgressRequest, opts ...grpc.CallOption) (*UpdateProgressResponse, error)
 }
 
 type taskServiceClient struct {
@@ -87,6 +94,16 @@ func (c *taskServiceClient) ReportResult(ctx context.Context, in *ReportResultRe
 	return out, nil
 }
 
+func (c *taskServiceClient) UpdateProgress(ctx context.Context, in *UpdateProgressRequest, opts ...grpc.CallOption) (*UpdateProgressResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateProgressResponse)
+	err := c.cc.Invoke(ctx, TaskService_UpdateProgress_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -110,6 +127,12 @@ type TaskServiceServer interface {
 	// the task to `failed` once `max_attempts` is exhausted. Returns
 	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	ReportResult(context.Context, *ReportResultRequest) (*ReportResultResponse, error)
+	// UpdateProgress attaches a free-form progress note to a task the caller
+	// owns and refreshes its lease (same effect as Heartbeat). The note is
+	// overwritten on each call and surfaced in the admin UI so operators can
+	// see what a long-running worker is doing. Returns FAILED_PRECONDITION
+	// when the caller no longer owns the claim.
+	UpdateProgress(context.Context, *UpdateProgressRequest) (*UpdateProgressResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -128,6 +151,9 @@ func (UnimplementedTaskServiceServer) Heartbeat(context.Context, *HeartbeatReque
 }
 func (UnimplementedTaskServiceServer) ReportResult(context.Context, *ReportResultRequest) (*ReportResultResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReportResult not implemented")
+}
+func (UnimplementedTaskServiceServer) UpdateProgress(context.Context, *UpdateProgressRequest) (*UpdateProgressResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateProgress not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -204,6 +230,24 @@ func _TaskService_ReportResult_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_UpdateProgress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateProgressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).UpdateProgress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_UpdateProgress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).UpdateProgress(ctx, req.(*UpdateProgressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -222,6 +266,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReportResult",
 			Handler:    _TaskService_ReportResult_Handler,
+		},
+		{
+			MethodName: "UpdateProgress",
+			Handler:    _TaskService_UpdateProgress_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

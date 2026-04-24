@@ -410,6 +410,104 @@ func (*ReportResultResponse) Descriptor() ([]byte, []int) {
 	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{6}
 }
 
+// UpdateProgressRequest records a free-form progress note. An empty `note`
+// clears any previously stored note on the task.
+type UpdateProgressRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	TaskId        string                 `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Note          string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProgressRequest) Reset() {
+	*x = UpdateProgressRequest{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProgressRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProgressRequest) ProtoMessage() {}
+
+func (x *UpdateProgressRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProgressRequest.ProtoReflect.Descriptor instead.
+func (*UpdateProgressRequest) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UpdateProgressRequest) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *UpdateProgressRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *UpdateProgressRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type UpdateProgressResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProgressResponse) Reset() {
+	*x = UpdateProgressResponse{}
+	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProgressResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProgressResponse) ProtoMessage() {}
+
+func (x *UpdateProgressResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProgressResponse.ProtoReflect.Descriptor instead.
+func (*UpdateProgressResponse) Descriptor() ([]byte, []int) {
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{8}
+}
+
 // TaskDetail mirrors the mastermind `tasks` row. Nullable columns become empty
 // strings or zero timestamps on the wire; the MCP adapter omits them when
 // serializing to JSON.
@@ -438,7 +536,7 @@ type TaskDetail struct {
 
 func (x *TaskDetail) Reset() {
 	*x = TaskDetail{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	mi := &file_internal_proto_tasks_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -450,7 +548,7 @@ func (x *TaskDetail) String() string {
 func (*TaskDetail) ProtoMessage() {}
 
 func (x *TaskDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[7]
+	mi := &file_internal_proto_tasks_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -463,7 +561,7 @@ func (x *TaskDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskDetail.ProtoReflect.Descriptor instead.
 func (*TaskDetail) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{7}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *TaskDetail) GetId() string {
@@ -600,7 +698,7 @@ type CreateTaskRequest struct {
 
 func (x *CreateTaskRequest) Reset() {
 	*x = CreateTaskRequest{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	mi := &file_internal_proto_tasks_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -612,7 +710,7 @@ func (x *CreateTaskRequest) String() string {
 func (*CreateTaskRequest) ProtoMessage() {}
 
 func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[8]
+	mi := &file_internal_proto_tasks_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -625,7 +723,7 @@ func (x *CreateTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskRequest.ProtoReflect.Descriptor instead.
 func (*CreateTaskRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{8}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateTaskRequest) GetName() string {
@@ -686,7 +784,7 @@ type CreateTaskResponse struct {
 
 func (x *CreateTaskResponse) Reset() {
 	*x = CreateTaskResponse{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	mi := &file_internal_proto_tasks_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -698,7 +796,7 @@ func (x *CreateTaskResponse) String() string {
 func (*CreateTaskResponse) ProtoMessage() {}
 
 func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[9]
+	mi := &file_internal_proto_tasks_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -711,7 +809,7 @@ func (x *CreateTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTaskResponse.ProtoReflect.Descriptor instead.
 func (*CreateTaskResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{9}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CreateTaskResponse) GetTask() *TaskDetail {
@@ -730,7 +828,7 @@ type GetTaskRequest struct {
 
 func (x *GetTaskRequest) Reset() {
 	*x = GetTaskRequest{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	mi := &file_internal_proto_tasks_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +840,7 @@ func (x *GetTaskRequest) String() string {
 func (*GetTaskRequest) ProtoMessage() {}
 
 func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[10]
+	mi := &file_internal_proto_tasks_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -755,7 +853,7 @@ func (x *GetTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskRequest.ProtoReflect.Descriptor instead.
 func (*GetTaskRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{10}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetTaskRequest) GetId() string {
@@ -774,7 +872,7 @@ type GetTaskResponse struct {
 
 func (x *GetTaskResponse) Reset() {
 	*x = GetTaskResponse{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	mi := &file_internal_proto_tasks_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -786,7 +884,7 @@ func (x *GetTaskResponse) String() string {
 func (*GetTaskResponse) ProtoMessage() {}
 
 func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[11]
+	mi := &file_internal_proto_tasks_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -799,7 +897,7 @@ func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskResponse.ProtoReflect.Descriptor instead.
 func (*GetTaskResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{11}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetTaskResponse) GetTask() *TaskDetail {
@@ -820,7 +918,7 @@ type ListTasksRequest struct {
 
 func (x *ListTasksRequest) Reset() {
 	*x = ListTasksRequest{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[12]
+	mi := &file_internal_proto_tasks_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -832,7 +930,7 @@ func (x *ListTasksRequest) String() string {
 func (*ListTasksRequest) ProtoMessage() {}
 
 func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[12]
+	mi := &file_internal_proto_tasks_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -845,7 +943,7 @@ func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
 func (*ListTasksRequest) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{12}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListTasksRequest) GetStatus() string {
@@ -879,7 +977,7 @@ type ListTasksResponse struct {
 
 func (x *ListTasksResponse) Reset() {
 	*x = ListTasksResponse{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[13]
+	mi := &file_internal_proto_tasks_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -891,7 +989,7 @@ func (x *ListTasksResponse) String() string {
 func (*ListTasksResponse) ProtoMessage() {}
 
 func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[13]
+	mi := &file_internal_proto_tasks_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -904,7 +1002,7 @@ func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
 func (*ListTasksResponse) Descriptor() ([]byte, []int) {
-	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{13}
+	return file_internal_proto_tasks_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListTasksResponse) GetItems() []*TaskDetail {
@@ -932,7 +1030,7 @@ type ReportResultRequest_Success struct {
 
 func (x *ReportResultRequest_Success) Reset() {
 	*x = ReportResultRequest_Success{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[14]
+	mi := &file_internal_proto_tasks_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -944,7 +1042,7 @@ func (x *ReportResultRequest_Success) String() string {
 func (*ReportResultRequest_Success) ProtoMessage() {}
 
 func (x *ReportResultRequest_Success) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[14]
+	mi := &file_internal_proto_tasks_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -972,7 +1070,7 @@ type ReportResultRequest_Failure struct {
 
 func (x *ReportResultRequest_Failure) Reset() {
 	*x = ReportResultRequest_Failure{}
-	mi := &file_internal_proto_tasks_proto_msgTypes[15]
+	mi := &file_internal_proto_tasks_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -984,7 +1082,7 @@ func (x *ReportResultRequest_Failure) String() string {
 func (*ReportResultRequest_Failure) ProtoMessage() {}
 
 func (x *ReportResultRequest_Failure) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_tasks_proto_msgTypes[15]
+	mi := &file_internal_proto_tasks_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1033,7 +1131,12 @@ const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\aFailure\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessageB\t\n" +
 	"\aoutcome\"\x16\n" +
-	"\x14ReportResultResponse\"\xbc\x05\n" +
+	"\x14ReportResultResponse\"a\n" +
+	"\x15UpdateProgressRequest\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x17\n" +
+	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"\x18\n" +
+	"\x16UpdateProgressResponse\"\xbc\x05\n" +
 	"\n" +
 	"TaskDetail\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -1079,11 +1182,12 @@ const file_internal_proto_tasks_proto_rawDesc = "" +
 	"\x06offset\x18\x03 \x01(\x05R\x06offset\"]\n" +
 	"\x11ListTasksResponse\x122\n" +
 	"\x05items\x18\x01 \x03(\v2\x1c.elpulpo.tasks.v1.TaskDetailR\x05items\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total2\x98\x02\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total2\xfd\x02\n" +
 	"\vTaskService\x12T\n" +
 	"\tClaimTask\x12\".elpulpo.tasks.v1.ClaimTaskRequest\x1a#.elpulpo.tasks.v1.ClaimTaskResponse\x12T\n" +
 	"\tHeartbeat\x12\".elpulpo.tasks.v1.HeartbeatRequest\x1a#.elpulpo.tasks.v1.HeartbeatResponse\x12]\n" +
-	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponse2\x8d\x02\n" +
+	"\fReportResult\x12%.elpulpo.tasks.v1.ReportResultRequest\x1a&.elpulpo.tasks.v1.ReportResultResponse\x12c\n" +
+	"\x0eUpdateProgress\x12'.elpulpo.tasks.v1.UpdateProgressRequest\x1a(.elpulpo.tasks.v1.UpdateProgressResponse2\x8d\x02\n" +
 	"\fAdminService\x12W\n" +
 	"\n" +
 	"CreateTask\x12#.elpulpo.tasks.v1.CreateTaskRequest\x1a$.elpulpo.tasks.v1.CreateTaskResponse\x12N\n" +
@@ -1102,7 +1206,7 @@ func file_internal_proto_tasks_proto_rawDescGZIP() []byte {
 	return file_internal_proto_tasks_proto_rawDescData
 }
 
-var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_internal_proto_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_internal_proto_tasks_proto_goTypes = []any{
 	(*Task)(nil),                        // 0: elpulpo.tasks.v1.Task
 	(*ClaimTaskRequest)(nil),            // 1: elpulpo.tasks.v1.ClaimTaskRequest
@@ -1111,45 +1215,49 @@ var file_internal_proto_tasks_proto_goTypes = []any{
 	(*HeartbeatResponse)(nil),           // 4: elpulpo.tasks.v1.HeartbeatResponse
 	(*ReportResultRequest)(nil),         // 5: elpulpo.tasks.v1.ReportResultRequest
 	(*ReportResultResponse)(nil),        // 6: elpulpo.tasks.v1.ReportResultResponse
-	(*TaskDetail)(nil),                  // 7: elpulpo.tasks.v1.TaskDetail
-	(*CreateTaskRequest)(nil),           // 8: elpulpo.tasks.v1.CreateTaskRequest
-	(*CreateTaskResponse)(nil),          // 9: elpulpo.tasks.v1.CreateTaskResponse
-	(*GetTaskRequest)(nil),              // 10: elpulpo.tasks.v1.GetTaskRequest
-	(*GetTaskResponse)(nil),             // 11: elpulpo.tasks.v1.GetTaskResponse
-	(*ListTasksRequest)(nil),            // 12: elpulpo.tasks.v1.ListTasksRequest
-	(*ListTasksResponse)(nil),           // 13: elpulpo.tasks.v1.ListTasksResponse
-	(*ReportResultRequest_Success)(nil), // 14: elpulpo.tasks.v1.ReportResultRequest.Success
-	(*ReportResultRequest_Failure)(nil), // 15: elpulpo.tasks.v1.ReportResultRequest.Failure
-	(*timestamppb.Timestamp)(nil),       // 16: google.protobuf.Timestamp
+	(*UpdateProgressRequest)(nil),       // 7: elpulpo.tasks.v1.UpdateProgressRequest
+	(*UpdateProgressResponse)(nil),      // 8: elpulpo.tasks.v1.UpdateProgressResponse
+	(*TaskDetail)(nil),                  // 9: elpulpo.tasks.v1.TaskDetail
+	(*CreateTaskRequest)(nil),           // 10: elpulpo.tasks.v1.CreateTaskRequest
+	(*CreateTaskResponse)(nil),          // 11: elpulpo.tasks.v1.CreateTaskResponse
+	(*GetTaskRequest)(nil),              // 12: elpulpo.tasks.v1.GetTaskRequest
+	(*GetTaskResponse)(nil),             // 13: elpulpo.tasks.v1.GetTaskResponse
+	(*ListTasksRequest)(nil),            // 14: elpulpo.tasks.v1.ListTasksRequest
+	(*ListTasksResponse)(nil),           // 15: elpulpo.tasks.v1.ListTasksResponse
+	(*ReportResultRequest_Success)(nil), // 16: elpulpo.tasks.v1.ReportResultRequest.Success
+	(*ReportResultRequest_Failure)(nil), // 17: elpulpo.tasks.v1.ReportResultRequest.Failure
+	(*timestamppb.Timestamp)(nil),       // 18: google.protobuf.Timestamp
 }
 var file_internal_proto_tasks_proto_depIdxs = []int32{
 	0,  // 0: elpulpo.tasks.v1.ClaimTaskResponse.task:type_name -> elpulpo.tasks.v1.Task
-	14, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
-	15, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
-	16, // 3: elpulpo.tasks.v1.TaskDetail.scheduled_for:type_name -> google.protobuf.Timestamp
-	16, // 4: elpulpo.tasks.v1.TaskDetail.claimed_at:type_name -> google.protobuf.Timestamp
-	16, // 5: elpulpo.tasks.v1.TaskDetail.last_heartbeat_at:type_name -> google.protobuf.Timestamp
-	16, // 6: elpulpo.tasks.v1.TaskDetail.completed_at:type_name -> google.protobuf.Timestamp
-	16, // 7: elpulpo.tasks.v1.TaskDetail.created_at:type_name -> google.protobuf.Timestamp
-	16, // 8: elpulpo.tasks.v1.TaskDetail.updated_at:type_name -> google.protobuf.Timestamp
-	16, // 9: elpulpo.tasks.v1.CreateTaskRequest.scheduled_for:type_name -> google.protobuf.Timestamp
-	7,  // 10: elpulpo.tasks.v1.CreateTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
-	7,  // 11: elpulpo.tasks.v1.GetTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
-	7,  // 12: elpulpo.tasks.v1.ListTasksResponse.items:type_name -> elpulpo.tasks.v1.TaskDetail
+	16, // 1: elpulpo.tasks.v1.ReportResultRequest.success:type_name -> elpulpo.tasks.v1.ReportResultRequest.Success
+	17, // 2: elpulpo.tasks.v1.ReportResultRequest.failure:type_name -> elpulpo.tasks.v1.ReportResultRequest.Failure
+	18, // 3: elpulpo.tasks.v1.TaskDetail.scheduled_for:type_name -> google.protobuf.Timestamp
+	18, // 4: elpulpo.tasks.v1.TaskDetail.claimed_at:type_name -> google.protobuf.Timestamp
+	18, // 5: elpulpo.tasks.v1.TaskDetail.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	18, // 6: elpulpo.tasks.v1.TaskDetail.completed_at:type_name -> google.protobuf.Timestamp
+	18, // 7: elpulpo.tasks.v1.TaskDetail.created_at:type_name -> google.protobuf.Timestamp
+	18, // 8: elpulpo.tasks.v1.TaskDetail.updated_at:type_name -> google.protobuf.Timestamp
+	18, // 9: elpulpo.tasks.v1.CreateTaskRequest.scheduled_for:type_name -> google.protobuf.Timestamp
+	9,  // 10: elpulpo.tasks.v1.CreateTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
+	9,  // 11: elpulpo.tasks.v1.GetTaskResponse.task:type_name -> elpulpo.tasks.v1.TaskDetail
+	9,  // 12: elpulpo.tasks.v1.ListTasksResponse.items:type_name -> elpulpo.tasks.v1.TaskDetail
 	1,  // 13: elpulpo.tasks.v1.TaskService.ClaimTask:input_type -> elpulpo.tasks.v1.ClaimTaskRequest
 	3,  // 14: elpulpo.tasks.v1.TaskService.Heartbeat:input_type -> elpulpo.tasks.v1.HeartbeatRequest
 	5,  // 15: elpulpo.tasks.v1.TaskService.ReportResult:input_type -> elpulpo.tasks.v1.ReportResultRequest
-	8,  // 16: elpulpo.tasks.v1.AdminService.CreateTask:input_type -> elpulpo.tasks.v1.CreateTaskRequest
-	10, // 17: elpulpo.tasks.v1.AdminService.GetTask:input_type -> elpulpo.tasks.v1.GetTaskRequest
-	12, // 18: elpulpo.tasks.v1.AdminService.ListTasks:input_type -> elpulpo.tasks.v1.ListTasksRequest
-	2,  // 19: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
-	4,  // 20: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
-	6,  // 21: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
-	9,  // 22: elpulpo.tasks.v1.AdminService.CreateTask:output_type -> elpulpo.tasks.v1.CreateTaskResponse
-	11, // 23: elpulpo.tasks.v1.AdminService.GetTask:output_type -> elpulpo.tasks.v1.GetTaskResponse
-	13, // 24: elpulpo.tasks.v1.AdminService.ListTasks:output_type -> elpulpo.tasks.v1.ListTasksResponse
-	19, // [19:25] is the sub-list for method output_type
-	13, // [13:19] is the sub-list for method input_type
+	7,  // 16: elpulpo.tasks.v1.TaskService.UpdateProgress:input_type -> elpulpo.tasks.v1.UpdateProgressRequest
+	10, // 17: elpulpo.tasks.v1.AdminService.CreateTask:input_type -> elpulpo.tasks.v1.CreateTaskRequest
+	12, // 18: elpulpo.tasks.v1.AdminService.GetTask:input_type -> elpulpo.tasks.v1.GetTaskRequest
+	14, // 19: elpulpo.tasks.v1.AdminService.ListTasks:input_type -> elpulpo.tasks.v1.ListTasksRequest
+	2,  // 20: elpulpo.tasks.v1.TaskService.ClaimTask:output_type -> elpulpo.tasks.v1.ClaimTaskResponse
+	4,  // 21: elpulpo.tasks.v1.TaskService.Heartbeat:output_type -> elpulpo.tasks.v1.HeartbeatResponse
+	6,  // 22: elpulpo.tasks.v1.TaskService.ReportResult:output_type -> elpulpo.tasks.v1.ReportResultResponse
+	8,  // 23: elpulpo.tasks.v1.TaskService.UpdateProgress:output_type -> elpulpo.tasks.v1.UpdateProgressResponse
+	11, // 24: elpulpo.tasks.v1.AdminService.CreateTask:output_type -> elpulpo.tasks.v1.CreateTaskResponse
+	13, // 25: elpulpo.tasks.v1.AdminService.GetTask:output_type -> elpulpo.tasks.v1.GetTaskResponse
+	15, // 26: elpulpo.tasks.v1.AdminService.ListTasks:output_type -> elpulpo.tasks.v1.ListTasksResponse
+	20, // [20:27] is the sub-list for method output_type
+	13, // [13:20] is the sub-list for method input_type
 	13, // [13:13] is the sub-list for extension type_name
 	13, // [13:13] is the sub-list for extension extendee
 	0,  // [0:13] is the sub-list for field type_name
@@ -1170,7 +1278,7 @@ func file_internal_proto_tasks_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_tasks_proto_rawDesc), len(file_internal_proto_tasks_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

@@ -199,3 +199,88 @@ func TestReportResult_FailureWrongOwnerFailsPrecondition(t *testing.T) {
 		t.Errorf("scheduled_for=%v, want nil", got.ScheduledFor)
 	}
 }
+
+func TestUpdateProgress_StoresNoteAndTransitionsRunning(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	claimed, _ := s.ClaimTask(ctx, "w1")
+
+	if err := s.UpdateProgress(ctx, "w1", claimed.ID, "step 1/3"); err != nil {
+		t.Fatalf("UpdateProgress: %v", err)
+	}
+	got, _ := s.GetTask(ctx, claimed.ID)
+	if got.Status != StatusRunning {
+		t.Errorf("status=%q, want running", got.Status)
+	}
+	if got.ProgressNote == nil || *got.ProgressNote != "step 1/3" {
+		t.Errorf("progress_note=%v, want step 1/3", got.ProgressNote)
+	}
+}
+
+func TestUpdateProgress_EmptyNoteClears(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	claimed, _ := s.ClaimTask(ctx, "w1")
+
+	_ = s.UpdateProgress(ctx, "w1", claimed.ID, "step 1")
+	if err := s.UpdateProgress(ctx, "w1", claimed.ID, ""); err != nil {
+		t.Fatalf("UpdateProgress: %v", err)
+	}
+	got, _ := s.GetTask(ctx, claimed.ID)
+	if got.ProgressNote != nil {
+		t.Errorf("progress_note=%v, want nil", got.ProgressNote)
+	}
+}
+
+func TestUpdateProgress_WrongOwnerFailsPrecondition(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	claimed, _ := s.ClaimTask(ctx, "w1")
+
+	err := s.UpdateProgress(ctx, "w2", claimed.ID, "spying")
+	if err != ErrNotOwner {
+		t.Errorf("got %v, want ErrNotOwner", err)
+	}
+	got, _ := s.GetTask(ctx, claimed.ID)
+	if got.ProgressNote != nil {
+		t.Errorf("progress_note=%v, want nil (wrong owner must not write)", got.ProgressNote)
+	}
+}
+
+func TestClaimTask_ClearsPriorProgressNote(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	// MaxAttempts=2 so the first failure retries.
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 2})
+	c1, _ := s.ClaimTask(ctx, "w1")
+	_ = s.UpdateProgress(ctx, "w1", c1.ID, "from attempt 1")
+	if _, err := s.ReportResult(ctx, "w1", c1.ID, false, "boom"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET scheduled_for = now() - interval '1 hour' WHERE id=$1`, c1.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	c2, err := s.ClaimTask(ctx, "w2")
+	if err != nil || c2 == nil {
+		t.Fatalf("second claim: %v %v", c2, err)
+	}
+	if c2.ProgressNote != nil {
+		t.Errorf("new claim still carries progress_note=%v", c2.ProgressNote)
+	}
+}

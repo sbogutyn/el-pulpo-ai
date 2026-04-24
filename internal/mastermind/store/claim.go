@@ -16,6 +16,7 @@ func (s *Store) ClaimTask(ctx context.Context, workerID string) (*Task, error) {
           claimed_by        = $1,
           claimed_at        = now(),
           last_heartbeat_at = now(),
+          progress_note     = NULL,
           updated_at        = now(),
           attempt_count     = attempt_count + 1
       WHERE id = (

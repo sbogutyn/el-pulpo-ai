@@ -28,6 +28,32 @@ func (s *Store) Heartbeat(ctx context.Context, workerID string, taskID uuid.UUID
 	return nil
 }
 
+// UpdateProgress stores a free-form progress note on the task and refreshes
+// the caller's lease (the note is overwritten on each call). An empty note
+// clears any previously stored note. Returns ErrNotOwner if the caller is
+// not the current claim holder.
+func (s *Store) UpdateProgress(ctx context.Context, workerID string, taskID uuid.UUID, note string) error {
+	var notePtr *string
+	if note != "" {
+		notePtr = &note
+	}
+	ct, err := s.pool.Exec(ctx, `
+      UPDATE tasks
+      SET progress_note     = $3,
+          last_heartbeat_at = now(),
+          status            = CASE WHEN status = 'claimed' THEN 'running' ELSE status END,
+          updated_at        = now()
+      WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
+    `, taskID, workerID, notePtr)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return ErrNotOwner
+	}
+	return nil
+}
+
 // ReportResult finalises a task the worker owns.
 //
 //	success = true  -> completed

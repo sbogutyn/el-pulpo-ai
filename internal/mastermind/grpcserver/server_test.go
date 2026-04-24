@@ -94,6 +94,51 @@ func TestHeartbeat_WrongOwner_FailsPrecondition(t *testing.T) {
 	}
 }
 
+func TestUpdateProgress_StoresNote(t *testing.T) {
+	client, s := startBufServer(t)
+	ctx := context.Background()
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	if err != nil {
+		t.Fatalf("ClaimTask: %v", err)
+	}
+	if _, err := client.UpdateProgress(ctx, &pb.UpdateProgressRequest{
+		WorkerId: "w1", TaskId: resp.Task.Id, Note: "half done",
+	}); err != nil {
+		t.Fatalf("UpdateProgress: %v", err)
+	}
+}
+
+func TestUpdateProgress_WrongOwner_FailsPrecondition(t *testing.T) {
+	client, s := startBufServer(t)
+	ctx := context.Background()
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	if err != nil {
+		t.Fatalf("ClaimTask: %v", err)
+	}
+	_, err = client.UpdateProgress(ctx, &pb.UpdateProgressRequest{
+		WorkerId: "other", TaskId: resp.Task.Id, Note: "n",
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("code=%v, want FailedPrecondition", status.Code(err))
+	}
+}
+
+func TestUpdateProgress_InvalidTaskID_FailsInvalidArgument(t *testing.T) {
+	client, _ := startBufServer(t)
+	_, err := client.UpdateProgress(context.Background(), &pb.UpdateProgressRequest{
+		WorkerId: "w", TaskId: "not-a-uuid", Note: "n",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
 func TestClaimTask_WithDeadline_StillReturnsNotFound(t *testing.T) {
 	client, _ := startBufServer(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)

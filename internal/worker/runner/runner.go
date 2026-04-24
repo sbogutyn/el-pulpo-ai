@@ -1,32 +1,53 @@
-// Package runner implements the worker claim loop and fake work.
+// Package runner implements the worker claim loop. It reads tasks from the
+// mastermind via [taskclient], runs a (currently placeholder) handler, and
+// reports progress and the final outcome back through the task's API.
 package runner
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"math/rand"
 	"time"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	pb "github.com/sbogutyn/el-pulpo-ai/internal/proto"
+	"github.com/sbogutyn/el-pulpo-ai/internal/worker/taskclient"
 )
+
+// Handler processes a claimed task. It is given a live [*taskclient.Task]
+// so it can emit progress updates with [taskclient.Task.Progress] and make
+// its own heartbeat decisions if it doesn't want the auto-heartbeat.
+//
+// The runner drives the task's lifecycle: a nil return marks it Complete,
+// a non-nil error marks it Fail with the error message. Handlers should
+// NOT call Complete/Fail themselves.
+type Handler func(ctx context.Context, task *taskclient.Task) error
 
 type Config struct {
 	WorkerID          string
 	PollInterval      time.Duration
 	HeartbeatInterval time.Duration
-	WorkDuration      time.Duration
+	// WorkDuration controls the default [FakeHandler]. Handlers supplied
+	// by callers are free to ignore it.
+	WorkDuration time.Duration
 }
 
 type Runner struct {
-	client pb.TaskServiceClient
-	cfg    Config
-	log    *slog.Logger
+	client  *taskclient.Client
+	cfg     Config
+	handler Handler
+	log     *slog.Logger
 }
 
-func New(c pb.TaskServiceClient, cfg Config, log *slog.Logger) *Runner {
+// New constructs a Runner that uses [FakeHandler] by default. Use
+// [Runner.SetHandler] or [NewWithHandler] to plug in real work.
+func New(rpc pb.TaskServiceClient, cfg Config, log *slog.Logger) *Runner {
+	return NewWithHandler(rpc, cfg, log, nil)
+}
+
+// NewWithHandler wires a Runner to a caller-supplied Handler. Passing a nil
+// handler falls back to [FakeHandler].
+func NewWithHandler(rpc pb.TaskServiceClient, cfg Config, log *slog.Logger, h Handler) *Runner {
 	if cfg.WorkDuration == 0 {
 		cfg.WorkDuration = time.Minute
 	}
@@ -36,13 +57,25 @@ func New(c pb.TaskServiceClient, cfg Config, log *slog.Logger) *Runner {
 	if cfg.HeartbeatInterval <= 0 {
 		cfg.HeartbeatInterval = 10 * time.Second
 	}
-	return &Runner{client: c, cfg: cfg, log: log}
+	if h == nil {
+		h = FakeHandler(cfg.WorkDuration)
+	}
+	return &Runner{
+		client:  taskclient.NewClient(rpc, cfg.WorkerID),
+		cfg:     cfg,
+		handler: h,
+		log:     log,
+	}
 }
 
+// SetHandler replaces the runner's handler. Safe to call before [Runner.Run].
+func (r *Runner) SetHandler(h Handler) { r.handler = h }
+
+// Run claims tasks in a loop until ctx is cancelled.
 func (r *Runner) Run(ctx context.Context) {
 	for ctx.Err() == nil {
-		task, err := r.client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: r.cfg.WorkerID})
-		if status.Code(err) == codes.NotFound {
+		task, err := r.client.Claim(ctx)
+		if errors.Is(err, taskclient.ErrNoTask) {
 			if !sleepWithJitter(ctx, r.cfg.PollInterval) {
 				return
 			}
@@ -56,62 +89,49 @@ func (r *Runner) Run(ctx context.Context) {
 			continue
 		}
 
-		r.runOne(ctx, task.Task)
+		r.runOne(ctx, task)
 	}
 }
 
-func (r *Runner) runOne(ctx context.Context, t *pb.Task) {
-	log := r.log.With("task_id", t.Id, "task_name", t.Name)
+func (r *Runner) runOne(ctx context.Context, task *taskclient.Task) {
+	log := r.log.With("task_id", task.ID(), "task_name", task.Name())
 	log.Info("claimed")
 
-	hbCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go r.heartbeatLoop(hbCtx, t.Id, log)
+	stopHB := task.StartHeartbeat(ctx, r.cfg.HeartbeatInterval, func(e error) {
+		log.Warn("heartbeat failed", "error", e)
+	})
+	defer stopHB()
 
-	workErr := r.fakeWork(ctx)
-	cancel()
+	workErr := r.handler(ctx, task)
 
-	report := &pb.ReportResultRequest{WorkerId: r.cfg.WorkerID, TaskId: t.Id}
 	if workErr == nil {
-		report.Outcome = &pb.ReportResultRequest_Success_{Success: &pb.ReportResultRequest_Success{}}
-	} else {
-		report.Outcome = &pb.ReportResultRequest_Failure_{
-			Failure: &pb.ReportResultRequest_Failure{Message: workErr.Error()},
+		if err := task.Complete(ctx); err != nil {
+			log.Warn("complete failed", "error", err)
+			return
 		}
-	}
-	if _, err := r.client.ReportResult(ctx, report); err != nil {
-		log.Warn("report failed", "error", err)
+		log.Info("completed")
 		return
 	}
-	log.Info("reported", "success", workErr == nil)
+	if err := task.Fail(ctx, workErr.Error()); err != nil {
+		log.Warn("fail report failed", "error", err, "work_error", workErr)
+		return
+	}
+	log.Info("failed", "error", workErr)
 }
 
-func (r *Runner) heartbeatLoop(ctx context.Context, taskID string, log *slog.Logger) {
-	t := time.NewTicker(r.cfg.HeartbeatInterval)
-	defer t.Stop()
-	for {
+// FakeHandler returns a Handler that emits a single progress note and then
+// sleeps for `d`. Used as the default when no real handler is plugged in.
+func FakeHandler(d time.Duration) Handler {
+	return func(ctx context.Context, task *taskclient.Task) error {
+		_ = task.Progress(ctx, "working")
+		t := time.NewTimer(d)
+		defer t.Stop()
 		select {
 		case <-ctx.Done():
-			return
+			return ctx.Err()
 		case <-t.C:
-			if _, err := r.client.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: r.cfg.WorkerID, TaskId: taskID}); err != nil {
-				if ctx.Err() != nil {
-					return
-				}
-				log.Warn("heartbeat failed", "error", err)
-			}
+			return nil
 		}
-	}
-}
-
-func (r *Runner) fakeWork(ctx context.Context) error {
-	t := time.NewTimer(r.cfg.WorkDuration)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
 	}
 }
 
