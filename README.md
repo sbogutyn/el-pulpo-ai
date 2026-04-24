@@ -69,7 +69,7 @@ Example `.mcp.json`:
 
 Tools: `create_task`, `get_task`, `list_tasks`. See the design doc for the full input/output schemas.
 
-Keep `ADMIN_TOKEN` out of version control — source it from your shell environment or a secrets manager.
+Keep `ADMIN_TOKEN` out of version control — source it from your shell environment or a secrets manager. Set `MASTERMIND_TLS=true` when mastermind is not on localhost; otherwise the bearer token is sent in cleartext.
 
 ## Metrics / Health
 
