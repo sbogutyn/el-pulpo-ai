@@ -1,0 +1,96 @@
+{{ define "dashboard_fragment" }}
+<aside class="queue">
+  <div class="queue-head">
+    <div class="queue-title">
+      Queue
+      <span class="pill accent">{{ len .Queue }}</span>
+    </div>
+    <span class="queue-sub">unclaimed · workers self-serve</span>
+  </div>
+  <div class="squiggle"></div>
+  <div class="queue-list">
+    {{ if not .Queue }}
+      <div class="queue-empty">— nothing queued —</div>
+    {{ end }}
+    {{ range .Queue }}
+      <a class="sk-box qc" href="/tasks/{{ .ID }}">
+        <div class="qc-head">
+          <span class="prio {{ priorityClass .Priority }}">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="qc-id">{{ shortID .ID.String }}</span>
+        </div>
+        <div class="qc-name">{{ .Name }}</div>
+        <div class="qc-meta">
+          <span>p{{ .Priority }} · attempt {{ .AttemptCount }}/{{ .MaxAttempts }}</span>
+          <span>{{ relTime .CreatedAt }}</span>
+        </div>
+      </a>
+    {{ end }}
+  </div>
+</aside>
+
+<section class="agents">
+  <div class="agents-head">
+    <div class="agents-title">Agents <span style="font-size:22px;color:var(--ink-faint);">({{ len .Workers }})</span></div>
+    <div class="agents-meta">{{ .BusyCount }} busy · {{ .IdleCount }} idle · {{ .OfflineCount }} offline</div>
+  </div>
+
+  <div class="agents-grid">
+    {{ if not .Workers }}
+      <div class="agents-empty">no workers have ever checked in</div>
+    {{ end }}
+    {{ range .Workers }}
+      {{ $state := agentState .Info.LastSeenAt .CurrentTask }}
+      <a class="sk-box agent {{ if eq $state "offline" }}faded{{ end }}" href="/dashboard/agents/{{ urlEscape .Info.ID }}">
+        <header class="agent-head">
+          <div class="agent-id">
+            <span class="avatar">{{ initials .Info.ID }}</span>
+            <div>
+              <div class="agent-name" title="{{ .Info.ID }}">{{ .Info.ID }}</div>
+              <div class="agent-state">
+                <span class="dot {{ $state }}"></span>{{ $state }}{{ if .Info.LastSeenAt }} · {{ relTime (deref_time .Info.LastSeenAt) }}{{ end }}
+              </div>
+            </div>
+          </div>
+          <div class="agent-stats">
+            <span><b>{{ .Info.ActiveTasks }}</b> live</span>
+            <span><b>{{ .Info.CompletedTasks }}</b> done</span>
+            {{ if gt .Info.FailedTasks 0 }}<span class="pill err">{{ .Info.FailedTasks }} failed</span>{{ end }}
+          </div>
+        </header>
+
+        {{ if .CurrentTask }}
+          <div class="current">
+            <div class="current-label">current</div>
+            <div class="current-name">
+              <span>{{ .CurrentTask.Name }}</span>
+              <span class="pill {{ if eq (printf "%s" .CurrentTask.Status) "running" }}filled{{ end }}">{{ .CurrentTask.Status }}</span>
+            </div>
+            <div class="current-progress">
+              {{ if .CurrentTask.ProgressNote }}
+                → {{ deref .CurrentTask.ProgressNote }}
+              {{ else }}
+                <span style="color:var(--ink-faint);">— no progress note —</span>
+              {{ end }}
+            </div>
+            <div class="bar-prog"><i style="width: {{ attemptPct .CurrentTask.AttemptCount .CurrentTask.MaxAttempts }}%;"></i></div>
+          </div>
+        {{ else }}
+          <div class="no-current">— waiting for work —</div>
+        {{ end }}
+
+        <div class="recent">
+          {{ if .RecentLogs }}
+            {{ range .RecentLogs }}
+              <div class="log"><span class="ts">{{ logTime .CreatedAt }}</span>{{ .Message }}</div>
+            {{ end }}
+          {{ else }}
+            <div class="recent-empty">no recent activity</div>
+          {{ end }}
+        </div>
+      </a>
+    {{ end }}
+  </div>
+</section>
+{{ end }}

@@ -27,6 +27,7 @@ DOCKER_BUILD_ARGS = \
 
 .PHONY: dev-up dev-down migrate-up migrate-down migrate-new \
         proto run-mastermind run-worker run-mcp run-cli test tidy build build-mcp build-cli \
+        demo-up demo-down demo-logs demo-build \
         docker-build docker-build-mastermind docker-build-worker docker-build-mcp \
         docker-buildx docker-buildx-mastermind docker-buildx-worker docker-buildx-mcp \
         docker-push docker-push-mastermind docker-push-worker docker-push-mcp \
@@ -37,6 +38,25 @@ dev-up:
 
 dev-down:
 	docker compose down
+
+# --- Dashboard demo stack ---------------------------------------------------
+# `demo-up` builds and starts: postgres + mastermind + 4 synthetic workers
+# (orca-01, finch-02, mole-03, newt-04) + a seeder that keeps the queue full.
+# Then browse to http://localhost:8080/dashboard (admin / admin).
+demo-up:
+	docker compose --profile demo up --build -d
+	@echo
+	@echo "  dashboard ready at: http://localhost:8080/dashboard"
+	@echo "  basic-auth:         admin / admin"
+
+demo-down:
+	docker compose --profile demo down
+
+demo-logs:
+	docker compose --profile demo logs -f --tail=100
+
+demo-build:
+	docker compose --profile demo build
 
 migrate-up:
 	$(MIGRATE) -path ./migrations -database "$(DATABASE_URL)" up

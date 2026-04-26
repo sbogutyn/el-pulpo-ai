@@ -1,4 +1,16 @@
-version: "3.9"
+# YAML anchors used by the four demo workers — keeps them DRY but lets each
+# override its own WORKER_ID and work-pace knobs.
+x-worker-defaults: &worker-defaults
+  build:
+    context: .
+    dockerfile: Dockerfile.demo
+  image: el-pulpo-demo:dev
+  command: ["worker"]
+  depends_on:
+    mastermind:
+      condition: service_started
+  restart: unless-stopped
+  profiles: ["demo"]
 
 services:
   postgres:
@@ -16,6 +28,102 @@ services:
       interval: 2s
       timeout: 2s
       retries: 20
+
+  mastermind:
+    build:
+      context: .
+      dockerfile: Dockerfile.mastermind
+    image: el-pulpo-mastermind:dev
+    environment:
+      DATABASE_URL: postgres://pulpo:pulpo@postgres:5432/pulpo?sslmode=disable
+      WORKER_TOKEN: devtoken
+      ADMIN_TOKEN: admintoken
+      ADMIN_USER: admin
+      ADMIN_PASSWORD: admin
+      LOG_FORMAT: text
+      LOG_LEVEL: info
+    ports:
+      - "8080:8080"   # admin UI / dashboard
+      - "50051:50051" # gRPC
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: ["demo"]
+
+  # Four workers with friendly fixed IDs. The names map onto the avatars that
+  # appear on /dashboard. Each one runs at a slightly different pace so the
+  # progress bars and recent-activity panels show variation.
+  worker-orca:
+    <<: *worker-defaults
+    container_name: el-pulpo-worker-orca
+    environment:
+      MASTERMIND_ADDR: mastermind:50051
+      WORKER_TOKEN: devtoken
+      WORKER_ID: orca-01
+      HEARTBEAT_INTERVAL: 5s
+      POLL_INTERVAL: 1500ms
+      DEMO_MIN_WORK: 6s
+      DEMO_MAX_WORK: 18s
+      DEMO_FAIL_PCT: "5"
+
+  worker-finch:
+    <<: *worker-defaults
+    container_name: el-pulpo-worker-finch
+    environment:
+      MASTERMIND_ADDR: mastermind:50051
+      WORKER_TOKEN: devtoken
+      WORKER_ID: finch-02
+      HEARTBEAT_INTERVAL: 5s
+      POLL_INTERVAL: 1500ms
+      DEMO_MIN_WORK: 4s
+      DEMO_MAX_WORK: 12s
+      DEMO_FAIL_PCT: "3"
+
+  worker-mole:
+    <<: *worker-defaults
+    container_name: el-pulpo-worker-mole
+    environment:
+      MASTERMIND_ADDR: mastermind:50051
+      WORKER_TOKEN: devtoken
+      WORKER_ID: mole-03
+      HEARTBEAT_INTERVAL: 5s
+      POLL_INTERVAL: 1500ms
+      DEMO_MIN_WORK: 10s
+      DEMO_MAX_WORK: 25s
+      DEMO_FAIL_PCT: "8"
+
+  worker-newt:
+    <<: *worker-defaults
+    container_name: el-pulpo-worker-newt
+    environment:
+      MASTERMIND_ADDR: mastermind:50051
+      WORKER_TOKEN: devtoken
+      WORKER_ID: newt-04
+      HEARTBEAT_INTERVAL: 5s
+      POLL_INTERVAL: 1500ms
+      DEMO_MIN_WORK: 8s
+      DEMO_MAX_WORK: 20s
+      DEMO_FAIL_PCT: "5"
+
+  seeder:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    image: el-pulpo-demo:dev
+    command: ["seeder"]
+    container_name: el-pulpo-seeder
+    environment:
+      MASTERMIND_ADDR: mastermind:50051
+      ADMIN_TOKEN: admintoken
+      SEEDER_INTERVAL: 6s
+      SEEDER_BURST: "2"
+      SEEDER_TARGET_BACKLOG: "10"
+    depends_on:
+      mastermind:
+        condition: service_started
+    restart: unless-stopped
+    profiles: ["demo"]
 
 volumes:
   pgdata:

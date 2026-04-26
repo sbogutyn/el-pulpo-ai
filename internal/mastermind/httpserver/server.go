@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"maps"
 	"net/http"
 	"time"
 
@@ -48,13 +49,18 @@ func New(s *store.Store, cfg Config, log *slog.Logger) (*Server, error) {
 			return *s
 		},
 	}
+	maps.Copy(funcs, dashboardFuncs())
 
 	pages := map[string]*template.Template{}
 	pageFiles := map[string][]string{
-		"tasks_list":   {"templates/base.html", "templates/tasks_list.html", "templates/tasks_fragment.html"},
-		"tasks_new":    {"templates/base.html", "templates/tasks_new.html"},
-		"tasks_edit":   {"templates/base.html", "templates/tasks_edit.html"},
-		"tasks_detail": {"templates/base.html", "templates/tasks_detail.html"},
+		"tasks_list":         {"templates/base.html", "templates/tasks_list.html", "templates/tasks_fragment.html"},
+		"tasks_new":          {"templates/base.html", "templates/tasks_new.html"},
+		"tasks_edit":         {"templates/base.html", "templates/tasks_edit.html"},
+		"tasks_detail":       {"templates/base.html", "templates/tasks_detail.html"},
+		"dashboard":             {"templates/dashboard.html", "templates/dashboard_fragment.html"},
+		"dashboard_fragment":    {"templates/dashboard_fragment.html"},
+		"agent_detail":          {"templates/agent_detail.html", "templates/agent_detail_fragment.html"},
+		"agent_detail_fragment": {"templates/agent_detail_fragment.html"},
 	}
 	for name, files := range pageFiles {
 		t, err := template.New("").Funcs(funcs).ParseFS(templatesFS, files...)
@@ -98,6 +104,11 @@ func (s *Server) routes() {
 	s.mux.Handle("/static/", auth.BasicAuth(s.cfg.AdminUser, s.cfg.AdminPassword)(http.StripPrefix("/static/", static)))
 
 	s.registerTasksRoutes()
+	s.registerDashboardRoutes()
+
+	s.mux.Handle("/wireframes", auth.BasicAuth(s.cfg.AdminUser, s.cfg.AdminPassword)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/wireframes/", http.StatusFound)
+	})))
 
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {

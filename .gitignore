@@ -2,6 +2,7 @@
 /bin/
 /mastermind
 /worker
+/demo
 /e2e/.bin/
 
 # Test output

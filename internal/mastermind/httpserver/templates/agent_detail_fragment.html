@@ -1,0 +1,82 @@
+{{ define "agent_detail_fragment" }}
+{{ $state := agentState .Detail.Info.LastSeenAt .Detail.CurrentTask }}
+<section class="detail-main">
+  <div class="sk-box detail-header">
+    <span class="avatar">{{ initials .Detail.Info.ID }}</span>
+    <div>
+      <h1>{{ .Detail.Info.ID }}</h1>
+      <div class="meta">
+        <span><span class="dot {{ $state }}"></span> <b>{{ $state }}</b></span>
+        {{ if .Detail.Info.LastSeenAt }}<span>last seen <b>{{ relTime (deref_time .Detail.Info.LastSeenAt) }}</b></span>{{ end }}
+        <span><b>{{ .Detail.Info.ActiveTasks }}</b> live</span>
+        <span><b>{{ .Detail.Info.CompletedTasks }}</b> done</span>
+        <span><b>{{ .Detail.Info.FailedTasks }}</b> failed</span>
+      </div>
+    </div>
+    <a class="detail-back" href="/dashboard">← all agents</a>
+  </div>
+
+  {{ if .Detail.CurrentTask }}
+    <div class="sk-box current">
+      <div class="current-label">current task</div>
+      <div class="current-name">
+        <a href="/tasks/{{ .Detail.CurrentTask.ID }}">{{ .Detail.CurrentTask.Name }}</a>
+        <span class="status-pill status-{{ .Detail.CurrentTask.Status }}">{{ .Detail.CurrentTask.Status }}</span>
+      </div>
+      <div class="current-progress">
+        {{ if .Detail.CurrentTask.ProgressNote }}
+          → {{ deref .Detail.CurrentTask.ProgressNote }}
+        {{ else }}
+          <span style="color:var(--ink-faint);">— no progress note —</span>
+        {{ end }}
+      </div>
+      <div class="bar-prog"><i style="width: {{ attemptPct .Detail.CurrentTask.AttemptCount .Detail.CurrentTask.MaxAttempts }}%;"></i></div>
+    </div>
+  {{ else }}
+    <div class="no-current">— not holding any task —</div>
+  {{ end }}
+
+  <div class="sk-box logs-card">
+    <div class="logs-head">
+      <div class="detail-section-title">Logs <span style="color:var(--ink-faint);font-size:14px;">· last {{ len .Detail.Logs }}</span></div>
+      <span class="live"><span class="pulse"></span>tailing</span>
+    </div>
+    {{ if .Detail.Logs }}
+      <div id="logs-scroll" class="logs-scroll">
+        {{ range .Detail.Logs }}
+          <div class="log-row">
+            <span class="ts">{{ logTime .CreatedAt }}</span>
+            <span><a class="src" href="/tasks/{{ .TaskID }}" title="{{ .TaskID }}">{{ .TaskName }}</a> {{ .Message }}</span>
+          </div>
+        {{ end }}
+      </div>
+    {{ else }}
+      <div id="logs-scroll" class="logs-scroll">
+        <div class="logs-empty">— no logs yet —</div>
+      </div>
+    {{ end }}
+  </div>
+</section>
+
+<aside class="detail-side">
+  <div class="detail-section-title">Recent tasks</div>
+  <div class="recent-list">
+    {{ if not .Detail.RecentTasks }}
+      <div class="recent-empty">— none yet —</div>
+    {{ end }}
+    {{ range .Detail.RecentTasks }}
+      <a class="sk-box recent-row" href="/tasks/{{ .Task.ID }}">
+        <div class="recent-row-head">
+          <span>{{ shortID .Task.ID.String }}</span>
+          <span class="status-pill status-{{ .Task.Status }}">{{ .Task.Status }}</span>
+        </div>
+        <div class="recent-row-name">{{ .Task.Name }}</div>
+        <div class="recent-row-head">
+          <span>p{{ .Task.Priority }} · att {{ .Task.AttemptCount }}/{{ .Task.MaxAttempts }}</span>
+          <span>{{ relTime .LastActivity }}</span>
+        </div>
+      </a>
+    {{ end }}
+  </div>
+</aside>
+{{ end }}
