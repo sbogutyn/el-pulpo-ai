@@ -193,10 +193,6 @@ func TestRequeueTask_PreservesIssueRefs(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestRequeueTask_ClearsGithubPRURL(t *testing.T) {
 	ctx := context.Background()
 	s, _ := Open(ctx, testDSN)
