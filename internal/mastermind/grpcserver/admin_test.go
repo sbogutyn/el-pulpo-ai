@@ -41,6 +41,8 @@ func startAdminBufServer(t *testing.T) (pb.AdminServiceClient, pb.TaskServiceCli
 		"/elpulpo.tasks.v1.TaskService/ReportResult":   testWorkerToken,
 		"/elpulpo.tasks.v1.TaskService/UpdateProgress": testWorkerToken,
 		"/elpulpo.tasks.v1.TaskService/AppendLog":      testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/SetJiraURL":     testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/OpenPR":         testWorkerToken,
 		"/elpulpo.tasks.v1.AdminService/CreateTask":    testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/GetTask":       testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListTasks":     testAdminToken,
@@ -48,6 +50,8 @@ func startAdminBufServer(t *testing.T) (pb.AdminServiceClient, pb.TaskServiceCli
 		"/elpulpo.tasks.v1.AdminService/CancelTask":    testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/RetryTask":     testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListWorkers":   testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/RequestReview": testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/FinalizeTask":  testAdminToken,
 	}
 
 	lis := bufconn.Listen(1 << 20)
@@ -355,5 +359,154 @@ func TestCreateTask_AcceptsValidInstructions(t *testing.T) {
 	}
 	if resp.GetTask().GetId() == "" {
 		t.Error("missing id")
+	}
+}
+
+// driveToPROpened creates a task and drives it through claim → heartbeat →
+// open_pr, returning the task id as a string. Used by the parked-state
+// finalize/review tests below.
+func driveToPROpened(t *testing.T, admin pb.AdminServiceClient, worker pb.TaskServiceClient) string {
+	t.Helper()
+	ctx := adminCtx()
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name:    "t",
+		Payload: []byte(`{"instructions":"go"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	id := created.GetTask().GetId()
+	wctx := workerCtx()
+	if _, err := worker.ClaimTask(wctx, &pb.ClaimTaskRequest{WorkerId: "w1"}); err != nil {
+		t.Fatalf("ClaimTask: %v", err)
+	}
+	if _, err := worker.Heartbeat(wctx, &pb.HeartbeatRequest{WorkerId: "w1", TaskId: id}); err != nil {
+		t.Fatalf("Heartbeat: %v", err)
+	}
+	if _, err := worker.OpenPR(wctx, &pb.OpenPRRequest{
+		WorkerId: "w1", TaskId: id, GithubPrUrl: "https://github.com/o/r/pull/1",
+	}); err != nil {
+		t.Fatalf("OpenPR: %v", err)
+	}
+	return id
+}
+
+func TestRequestReview_HappyPath(t *testing.T) {
+	admin, worker, _ := startAdminBufServer(t)
+	id := driveToPROpened(t, admin, worker)
+
+	resp, err := admin.RequestReview(adminCtx(), &pb.RequestReviewRequest{Id: id})
+	if err != nil {
+		t.Fatalf("RequestReview: %v", err)
+	}
+	if got := resp.GetTask().GetStatus(); got != "review_requested" {
+		t.Errorf("status=%q, want review_requested", got)
+	}
+}
+
+func TestRequestReview_RejectsFromInProgress(t *testing.T) {
+	admin, worker, _ := startAdminBufServer(t)
+	created, _ := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{
+		Name:    "t",
+		Payload: []byte(`{"instructions":"go"}`),
+	})
+	wctx := workerCtx()
+	_, _ = worker.ClaimTask(wctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	_, _ = worker.Heartbeat(wctx, &pb.HeartbeatRequest{WorkerId: "w1", TaskId: created.GetTask().GetId()})
+
+	_, err := admin.RequestReview(adminCtx(), &pb.RequestReviewRequest{Id: created.GetTask().GetId()})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("code=%v, want FailedPrecondition", status.Code(err))
+	}
+}
+
+func TestRequestReview_BadUUID(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	_, err := admin.RequestReview(adminCtx(), &pb.RequestReviewRequest{Id: "not-a-uuid"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestRequestReview_NotFound(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	_, err := admin.RequestReview(adminCtx(), &pb.RequestReviewRequest{Id: "00000000-0000-0000-0000-000000000000"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("code=%v, want NotFound", status.Code(err))
+	}
+}
+
+func TestFinalizeTask_Success(t *testing.T) {
+	admin, worker, _ := startAdminBufServer(t)
+	id := driveToPROpened(t, admin, worker)
+
+	resp, err := admin.FinalizeTask(adminCtx(), &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	})
+	if err != nil {
+		t.Fatalf("FinalizeTask: %v", err)
+	}
+	if got := resp.GetTask().GetStatus(); got != "completed" {
+		t.Errorf("status=%q, want completed", got)
+	}
+}
+
+func TestFinalizeTask_Failure(t *testing.T) {
+	admin, worker, _ := startAdminBufServer(t)
+	id := driveToPROpened(t, admin, worker)
+
+	resp, err := admin.FinalizeTask(adminCtx(), &pb.FinalizeTaskRequest{
+		Id: id,
+		Outcome: &pb.FinalizeTaskRequest_Failure_{
+			Failure: &pb.FinalizeTaskRequest_Failure{Message: "rejected"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FinalizeTask: %v", err)
+	}
+	if got := resp.GetTask().GetStatus(); got != "failed" {
+		t.Errorf("status=%q, want failed", got)
+	}
+	if got := resp.GetTask().GetLastError(); got != "rejected" {
+		t.Errorf("last_error=%q, want rejected", got)
+	}
+}
+
+func TestFinalizeTask_RequiresOutcome(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	_, err := admin.FinalizeTask(adminCtx(), &pb.FinalizeTaskRequest{Id: "00000000-0000-0000-0000-000000000000"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestFinalizeTask_RejectsFromInProgress(t *testing.T) {
+	admin, worker, _ := startAdminBufServer(t)
+	created, _ := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{
+		Name:    "t",
+		Payload: []byte(`{"instructions":"go"}`),
+	})
+	wctx := workerCtx()
+	_, _ = worker.ClaimTask(wctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	_, _ = worker.Heartbeat(wctx, &pb.HeartbeatRequest{WorkerId: "w1", TaskId: created.GetTask().GetId()})
+
+	_, err := admin.FinalizeTask(adminCtx(), &pb.FinalizeTaskRequest{
+		Id:      created.GetTask().GetId(),
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("code=%v, want FailedPrecondition", status.Code(err))
+	}
+}
+
+func TestFinalizeTask_NotFound(t *testing.T) {
+	admin, _, _ := startAdminBufServer(t)
+	_, err := admin.FinalizeTask(adminCtx(), &pb.FinalizeTaskRequest{
+		Id:      "00000000-0000-0000-0000-000000000000",
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("code=%v, want NotFound", status.Code(err))
 	}
 }
