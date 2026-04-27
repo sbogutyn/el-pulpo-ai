@@ -13,5 +13,7 @@ func NewServer(admin pb.AdminServiceClient) *mcp.Server {
 	registerCreateTask(s, admin)
 	registerGetTask(s, admin)
 	registerListTasks(s, admin)
+	registerRequestReview(s, admin)
+	registerFinalizeTask(s, admin)
 	return s
 }
