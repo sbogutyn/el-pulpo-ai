@@ -95,6 +95,8 @@ func newWorkerFixture(t *testing.T) *workerFixture {
 		"/elpulpo.tasks.v1.TaskService/ReportResult":   testWorkerToken,
 		"/elpulpo.tasks.v1.TaskService/UpdateProgress": testWorkerToken,
 		"/elpulpo.tasks.v1.TaskService/AppendLog":      testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/SetJiraURL":     testWorkerToken,
+		"/elpulpo.tasks.v1.TaskService/OpenPR":         testWorkerToken,
 	}
 
 	lis := bufconn.Listen(1 << 20)

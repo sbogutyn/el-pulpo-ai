@@ -165,6 +165,34 @@ func (s *State) Fail(ctx context.Context, taskID, message string) error {
 	return nil
 }
 
+// SetJiraURL attaches a JIRA URL to the current task. The taskID must match
+// the current claim (or be empty to refer to it implicitly). Returns
+// ErrNoCurrentTask when idle and ErrTaskNotMatching when the id doesn't
+// match.
+func (s *State) SetJiraURL(ctx context.Context, taskID, url string) error {
+	t, err := s.requireTask(taskID)
+	if err != nil {
+		return err
+	}
+	return t.SetJiraURL(ctx, url)
+}
+
+// OpenPR drives the worker's claimed task through the in_progress ->
+// pr_opened transition: it sets github_pr_url and releases the claim.
+// On success the local State is cleared (mirroring Complete/Fail) so the
+// agent may immediately claim_next_task again.
+func (s *State) OpenPR(ctx context.Context, taskID, url string) error {
+	t, err := s.requireTask(taskID)
+	if err != nil {
+		return err
+	}
+	if err := t.OpenPR(ctx, url); err != nil {
+		return err
+	}
+	s.clear()
+	return nil
+}
+
 // Release drops the in-memory claim without calling Complete/Fail on
 // mastermind. Used only at worker shutdown: the server-side reaper will
 // re-queue the task after its lease expires.

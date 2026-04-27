@@ -122,3 +122,57 @@ func seedTask(t *testing.T, fx *workerFixture, name string) uuid.UUID {
 	}
 	return created.ID
 }
+
+func TestState_SetJiraURL_Delegates(t *testing.T) {
+	fx := newWorkerFixture(t)
+	ctx := context.Background()
+	seedTask(t, fx, "job-A")
+
+	task, err := fx.state.ClaimNext(ctx)
+	if err != nil {
+		t.Fatalf("ClaimNext: %v", err)
+	}
+	if err := fx.state.SetJiraURL(ctx, task.ID(), "https://jira/T-1"); err != nil {
+		t.Fatalf("SetJiraURL: %v", err)
+	}
+
+	id, _ := uuid.Parse(task.ID())
+	got, _ := fx.store.GetTask(ctx, id)
+	if got.JiraURL == nil || *got.JiraURL != "https://jira/T-1" {
+		t.Errorf("jira_url=%v, want https://jira/T-1", got.JiraURL)
+	}
+}
+
+func TestState_OpenPR_ClearsCurrent(t *testing.T) {
+	fx := newWorkerFixture(t)
+	ctx := context.Background()
+	seedTask(t, fx, "job-A")
+
+	task, err := fx.state.ClaimNext(ctx)
+	if err != nil {
+		t.Fatalf("ClaimNext: %v", err)
+	}
+	// Must heartbeat first so the server-side allowed_from gate is satisfied
+	// (in_progress, not claimed). The fixture's State runs an auto-heartbeat,
+	// but to avoid timing flakes call it explicitly via Progress.
+	if err := fx.state.Progress(ctx, task.ID(), "starting"); err != nil {
+		t.Fatalf("Progress: %v", err)
+	}
+
+	if err := fx.state.OpenPR(ctx, task.ID(), "https://github.com/o/r/pull/1"); err != nil {
+		t.Fatalf("OpenPR: %v", err)
+	}
+	// Must now be idle.
+	if _, err := fx.state.Current(); !errors.Is(err, ErrNoCurrentTask) {
+		t.Errorf("Current err=%v, want ErrNoCurrentTask", err)
+	}
+	// Server side: status should be pr_opened with the URL set.
+	id, _ := uuid.Parse(task.ID())
+	got, _ := fx.store.GetTask(ctx, id)
+	if got.Status != store.StatusPROpened {
+		t.Errorf("status=%q, want pr_opened", got.Status)
+	}
+	if got.GithubPRURL == nil || *got.GithubPRURL != "https://github.com/o/r/pull/1" {
+		t.Errorf("github_pr_url=%v, want https://github.com/o/r/pull/1", got.GithubPRURL)
+	}
+}
