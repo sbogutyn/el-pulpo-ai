@@ -154,7 +154,7 @@ func registerGetTask(s *mcp.Server, admin pb.AdminServiceClient) {
 }
 
 type ListTasksInput struct {
-	Status string `json:"status,omitempty" jsonschema:"filter: pending|claimed|running|completed|failed"`
+	Status string `json:"status,omitempty" jsonschema:"filter: pending|claimed|in_progress|pr_opened|review_requested|completed|failed"`
 	Limit  int32  `json:"limit,omitempty" jsonschema:"page size, default 50, max 500"`
 	Offset int32  `json:"offset,omitempty" jsonschema:"pagination offset, default 0"`
 }

@@ -125,7 +125,7 @@ func runTasksGet(ctx context.Context, cfg Config, args []string, stdout, stderr 
 func runTasksList(ctx context.Context, cfg Config, args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("tasks list", flag.ContinueOnError)
 	var (
-		statusF = fs.String("status", "", "filter: pending|claimed|running|completed|failed")
+		statusF = fs.String("status", "", "filter: pending|claimed|in_progress|pr_opened|review_requested|completed|failed")
 		limit   = fs.Int("limit", 50, "page size (1..500)")
 		offset  = fs.Int("offset", 0, "pagination offset")
 		jsonOut = fs.Bool("json", false, "emit raw JSON rather than a table")
