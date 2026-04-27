@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestHeartbeat_TransitionsClaimedToRunning(t *testing.T) {
+func TestHeartbeat_TransitionsClaimedToInProgress(t *testing.T) {
 	ctx := context.Background()
 	s, _ := Open(ctx, testDSN)
 	defer s.Close()
@@ -200,7 +200,7 @@ func TestReportResult_FailureWrongOwnerFailsPrecondition(t *testing.T) {
 	}
 }
 
-func TestUpdateProgress_StoresNoteAndTransitionsRunning(t *testing.T) {
+func TestUpdateProgress_StoresNoteAndTransitionsInProgress(t *testing.T) {
 	ctx := context.Background()
 	s, _ := Open(ctx, testDSN)
 	defer s.Close()

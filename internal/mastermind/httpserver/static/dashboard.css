@@ -548,9 +548,11 @@ a { color: inherit; }
 }
 .status-pending   { background: var(--paper-soft); color: var(--ink-soft); border: 1px solid var(--ink-faint); }
 .status-claimed,
-.status-running   { background: var(--ink); color: var(--paper); }
+.status-in_progress   { background: var(--ink); color: var(--paper); }
 .status-completed { background: color-mix(in srgb, var(--ok) 26%, var(--paper)); color: var(--ink); }
 .status-failed    { background: color-mix(in srgb, var(--err) 26%, var(--paper)); color: var(--ink); }
+.status-pr_opened,
+.status-review_requested { background: var(--ink); color: var(--paper); }
 
 @media (max-width: 880px) {
   .detail { grid-template-columns: 1fr; height: auto; }
