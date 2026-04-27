@@ -24,6 +24,8 @@ const (
 	TaskService_ReportResult_FullMethodName   = "/elpulpo.tasks.v1.TaskService/ReportResult"
 	TaskService_UpdateProgress_FullMethodName = "/elpulpo.tasks.v1.TaskService/UpdateProgress"
 	TaskService_AppendLog_FullMethodName      = "/elpulpo.tasks.v1.TaskService/AppendLog"
+	TaskService_SetJiraURL_FullMethodName     = "/elpulpo.tasks.v1.TaskService/SetJiraURL"
+	TaskService_OpenPR_FullMethodName         = "/elpulpo.tasks.v1.TaskService/OpenPR"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -61,6 +63,16 @@ type TaskServiceClient interface {
 	// record a narrative trail of what the worker did. Returns
 	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	AppendLog(ctx context.Context, in *AppendLogRequest, opts ...grpc.CallOption) (*AppendLogResponse, error)
+	// SetJiraURL attaches a JIRA issue URL to the caller's claimed task.
+	// Allowed from `claimed` or `in_progress`. Refreshes the lease.
+	// Returns FAILED_PRECONDITION when the caller no longer owns the claim.
+	SetJiraURL(ctx context.Context, in *SetJiraURLRequest, opts ...grpc.CallOption) (*SetJiraURLResponse, error)
+	// OpenPR atomically transitions the caller's `in_progress` task to
+	// `pr_opened`, sets github_pr_url, and releases the claim. Returns
+	// INVALID_ARGUMENT when github_pr_url is empty and FAILED_PRECONDITION
+	// when the caller no longer owns the claim or the task is not in
+	// `in_progress`.
+	OpenPR(ctx context.Context, in *OpenPRRequest, opts ...grpc.CallOption) (*OpenPRResponse, error)
 }
 
 type taskServiceClient struct {
@@ -121,6 +133,26 @@ func (c *taskServiceClient) AppendLog(ctx context.Context, in *AppendLogRequest,
 	return out, nil
 }
 
+func (c *taskServiceClient) SetJiraURL(ctx context.Context, in *SetJiraURLRequest, opts ...grpc.CallOption) (*SetJiraURLResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetJiraURLResponse)
+	err := c.cc.Invoke(ctx, TaskService_SetJiraURL_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) OpenPR(ctx context.Context, in *OpenPRRequest, opts ...grpc.CallOption) (*OpenPRResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OpenPRResponse)
+	err := c.cc.Invoke(ctx, TaskService_OpenPR_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -156,6 +188,16 @@ type TaskServiceServer interface {
 	// record a narrative trail of what the worker did. Returns
 	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	AppendLog(context.Context, *AppendLogRequest) (*AppendLogResponse, error)
+	// SetJiraURL attaches a JIRA issue URL to the caller's claimed task.
+	// Allowed from `claimed` or `in_progress`. Refreshes the lease.
+	// Returns FAILED_PRECONDITION when the caller no longer owns the claim.
+	SetJiraURL(context.Context, *SetJiraURLRequest) (*SetJiraURLResponse, error)
+	// OpenPR atomically transitions the caller's `in_progress` task to
+	// `pr_opened`, sets github_pr_url, and releases the claim. Returns
+	// INVALID_ARGUMENT when github_pr_url is empty and FAILED_PRECONDITION
+	// when the caller no longer owns the claim or the task is not in
+	// `in_progress`.
+	OpenPR(context.Context, *OpenPRRequest) (*OpenPRResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -180,6 +222,12 @@ func (UnimplementedTaskServiceServer) UpdateProgress(context.Context, *UpdatePro
 }
 func (UnimplementedTaskServiceServer) AppendLog(context.Context, *AppendLogRequest) (*AppendLogResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AppendLog not implemented")
+}
+func (UnimplementedTaskServiceServer) SetJiraURL(context.Context, *SetJiraURLRequest) (*SetJiraURLResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetJiraURL not implemented")
+}
+func (UnimplementedTaskServiceServer) OpenPR(context.Context, *OpenPRRequest) (*OpenPRResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OpenPR not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -292,6 +340,42 @@ func _TaskService_AppendLog_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_SetJiraURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetJiraURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).SetJiraURL(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_SetJiraURL_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).SetJiraURL(ctx, req.(*SetJiraURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_OpenPR_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OpenPRRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).OpenPR(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_OpenPR_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).OpenPR(ctx, req.(*OpenPRRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -319,19 +403,29 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "AppendLog",
 			Handler:    _TaskService_AppendLog_Handler,
 		},
+		{
+			MethodName: "SetJiraURL",
+			Handler:    _TaskService_SetJiraURL_Handler,
+		},
+		{
+			MethodName: "OpenPR",
+			Handler:    _TaskService_OpenPR_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "internal/proto/tasks.proto",
 }
 
 const (
-	AdminService_CreateTask_FullMethodName   = "/elpulpo.tasks.v1.AdminService/CreateTask"
-	AdminService_GetTask_FullMethodName      = "/elpulpo.tasks.v1.AdminService/GetTask"
-	AdminService_ListTasks_FullMethodName    = "/elpulpo.tasks.v1.AdminService/ListTasks"
-	AdminService_ListTaskLogs_FullMethodName = "/elpulpo.tasks.v1.AdminService/ListTaskLogs"
-	AdminService_CancelTask_FullMethodName   = "/elpulpo.tasks.v1.AdminService/CancelTask"
-	AdminService_RetryTask_FullMethodName    = "/elpulpo.tasks.v1.AdminService/RetryTask"
-	AdminService_ListWorkers_FullMethodName  = "/elpulpo.tasks.v1.AdminService/ListWorkers"
+	AdminService_CreateTask_FullMethodName    = "/elpulpo.tasks.v1.AdminService/CreateTask"
+	AdminService_GetTask_FullMethodName       = "/elpulpo.tasks.v1.AdminService/GetTask"
+	AdminService_ListTasks_FullMethodName     = "/elpulpo.tasks.v1.AdminService/ListTasks"
+	AdminService_ListTaskLogs_FullMethodName  = "/elpulpo.tasks.v1.AdminService/ListTaskLogs"
+	AdminService_CancelTask_FullMethodName    = "/elpulpo.tasks.v1.AdminService/CancelTask"
+	AdminService_RetryTask_FullMethodName     = "/elpulpo.tasks.v1.AdminService/RetryTask"
+	AdminService_RequestReview_FullMethodName = "/elpulpo.tasks.v1.AdminService/RequestReview"
+	AdminService_FinalizeTask_FullMethodName  = "/elpulpo.tasks.v1.AdminService/FinalizeTask"
+	AdminService_ListWorkers_FullMethodName   = "/elpulpo.tasks.v1.AdminService/ListWorkers"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -362,6 +456,13 @@ type AdminServiceClient interface {
 	// or failed. Returns FAILED_PRECONDITION while the task is claimed or
 	// running.
 	RetryTask(ctx context.Context, in *RetryTaskRequest, opts ...grpc.CallOption) (*RetryTaskResponse, error)
+	// RequestReview transitions a `pr_opened` task to `review_requested`.
+	// FAILED_PRECONDITION from any other state.
+	RequestReview(ctx context.Context, in *RequestReviewRequest, opts ...grpc.CallOption) (*RequestReviewResponse, error)
+	// FinalizeTask terminates a parked task with success or failure. Allowed
+	// only from `pr_opened` or `review_requested`. `outcome` is a oneof so
+	// "neither set" / "both set" are unrepresentable.
+	FinalizeTask(ctx context.Context, in *FinalizeTaskRequest, opts ...grpc.CallOption) (*FinalizeTaskResponse, error)
 	// ListWorkers returns the distinct worker identities mastermind has seen
 	// claim work, alongside lightweight status per worker (how many tasks they
 	// currently hold and when they last sent a heartbeat). Derived purely from
@@ -437,6 +538,26 @@ func (c *adminServiceClient) RetryTask(ctx context.Context, in *RetryTaskRequest
 	return out, nil
 }
 
+func (c *adminServiceClient) RequestReview(ctx context.Context, in *RequestReviewRequest, opts ...grpc.CallOption) (*RequestReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestReviewResponse)
+	err := c.cc.Invoke(ctx, AdminService_RequestReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) FinalizeTask(ctx context.Context, in *FinalizeTaskRequest, opts ...grpc.CallOption) (*FinalizeTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FinalizeTaskResponse)
+	err := c.cc.Invoke(ctx, AdminService_FinalizeTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *adminServiceClient) ListWorkers(ctx context.Context, in *ListWorkersRequest, opts ...grpc.CallOption) (*ListWorkersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWorkersResponse)
@@ -475,6 +596,13 @@ type AdminServiceServer interface {
 	// or failed. Returns FAILED_PRECONDITION while the task is claimed or
 	// running.
 	RetryTask(context.Context, *RetryTaskRequest) (*RetryTaskResponse, error)
+	// RequestReview transitions a `pr_opened` task to `review_requested`.
+	// FAILED_PRECONDITION from any other state.
+	RequestReview(context.Context, *RequestReviewRequest) (*RequestReviewResponse, error)
+	// FinalizeTask terminates a parked task with success or failure. Allowed
+	// only from `pr_opened` or `review_requested`. `outcome` is a oneof so
+	// "neither set" / "both set" are unrepresentable.
+	FinalizeTask(context.Context, *FinalizeTaskRequest) (*FinalizeTaskResponse, error)
 	// ListWorkers returns the distinct worker identities mastermind has seen
 	// claim work, alongside lightweight status per worker (how many tasks they
 	// currently hold and when they last sent a heartbeat). Derived purely from
@@ -507,6 +635,12 @@ func (UnimplementedAdminServiceServer) CancelTask(context.Context, *CancelTaskRe
 }
 func (UnimplementedAdminServiceServer) RetryTask(context.Context, *RetryTaskRequest) (*RetryTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RetryTask not implemented")
+}
+func (UnimplementedAdminServiceServer) RequestReview(context.Context, *RequestReviewRequest) (*RequestReviewResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestReview not implemented")
+}
+func (UnimplementedAdminServiceServer) FinalizeTask(context.Context, *FinalizeTaskRequest) (*FinalizeTaskResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FinalizeTask not implemented")
 }
 func (UnimplementedAdminServiceServer) ListWorkers(context.Context, *ListWorkersRequest) (*ListWorkersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorkers not implemented")
@@ -640,6 +774,42 @@ func _AdminService_RetryTask_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_RequestReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).RequestReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_RequestReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).RequestReview(ctx, req.(*RequestReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_FinalizeTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).FinalizeTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_FinalizeTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).FinalizeTask(ctx, req.(*FinalizeTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AdminService_ListWorkers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListWorkersRequest)
 	if err := dec(in); err != nil {
@@ -688,6 +858,14 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RetryTask",
 			Handler:    _AdminService_RetryTask_Handler,
+		},
+		{
+			MethodName: "RequestReview",
+			Handler:    _AdminService_RequestReview_Handler,
+		},
+		{
+			MethodName: "FinalizeTask",
+			Handler:    _AdminService_FinalizeTask_Handler,
 		},
 		{
 			MethodName: "ListWorkers",

@@ -41,6 +41,18 @@ service TaskService {
   // record a narrative trail of what the worker did. Returns
   // FAILED_PRECONDITION when the caller no longer owns the claim.
   rpc AppendLog(AppendLogRequest) returns (AppendLogResponse);
+
+  // SetJiraURL attaches a JIRA issue URL to the caller's claimed task.
+  // Allowed from `claimed` or `in_progress`. Refreshes the lease.
+  // Returns FAILED_PRECONDITION when the caller no longer owns the claim.
+  rpc SetJiraURL(SetJiraURLRequest) returns (SetJiraURLResponse);
+
+  // OpenPR atomically transitions the caller's `in_progress` task to
+  // `pr_opened`, sets github_pr_url, and releases the claim. Returns
+  // INVALID_ARGUMENT when github_pr_url is empty and FAILED_PRECONDITION
+  // when the caller no longer owns the claim or the task is not in
+  // `in_progress`.
+  rpc OpenPR(OpenPRRequest) returns (OpenPRResponse);
 }
 
 // Task is the unit of work handed from mastermind to a worker.
@@ -131,6 +143,22 @@ message AppendLogResponse {
   int64 id = 1;
 }
 
+// SetJiraURLRequest attaches a JIRA URL to the caller's claimed task.
+message SetJiraURLRequest  {
+  string worker_id = 1;
+  string task_id   = 2;
+  string url       = 3;
+}
+message SetJiraURLResponse {}
+
+// OpenPRRequest atomically opens a PR and releases the worker's claim.
+message OpenPRRequest {
+  string worker_id     = 1;
+  string task_id       = 2;
+  string github_pr_url = 3;
+}
+message OpenPRResponse {}
+
 // TaskLogEntry mirrors one row of the `task_logs` table.
 message TaskLogEntry {
   int64  id                              = 1;
@@ -168,6 +196,15 @@ service AdminService {
   // or failed. Returns FAILED_PRECONDITION while the task is claimed or
   // running.
   rpc RetryTask(RetryTaskRequest) returns (RetryTaskResponse);
+
+  // RequestReview transitions a `pr_opened` task to `review_requested`.
+  // FAILED_PRECONDITION from any other state.
+  rpc RequestReview(RequestReviewRequest) returns (RequestReviewResponse);
+
+  // FinalizeTask terminates a parked task with success or failure. Allowed
+  // only from `pr_opened` or `review_requested`. `outcome` is a oneof so
+  // "neither set" / "both set" are unrepresentable.
+  rpc FinalizeTask(FinalizeTaskRequest) returns (FinalizeTaskResponse);
 
   // ListWorkers returns the distinct worker identities mastermind has seen
   // claim work, alongside lightweight status per worker (how many tasks they
@@ -237,6 +274,20 @@ message CancelTaskResponse {}
 
 message RetryTaskRequest  { string id = 1; }
 message RetryTaskResponse { TaskDetail task = 1; }
+
+message RequestReviewRequest  { string id = 1; }
+message RequestReviewResponse { TaskDetail task = 1; }
+
+message FinalizeTaskRequest {
+  string id = 1;
+  oneof outcome {
+    Success success = 2;
+    Failure failure = 3;
+  }
+  message Success {}
+  message Failure { string message = 1; }
+}
+message FinalizeTaskResponse { TaskDetail task = 1; }
 
 // WorkerInfo describes one distinct worker identity that has at some point
 // claimed a task. All fields are derived from aggregations over the tasks
