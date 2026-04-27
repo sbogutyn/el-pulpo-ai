@@ -9,7 +9,7 @@ import (
 // to drive a freshly-created task all the way to pr_opened.
 func openedPR(t *testing.T, s *Store, ctx context.Context, worker string) Task {
 	t.Helper()
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, worker)
 	_ = s.Heartbeat(ctx, worker, claimed.ID)
 	if err := s.OpenPR(ctx, worker, claimed.ID, "https://github.com/o/r/pull/1"); err != nil {
@@ -42,7 +42,7 @@ func TestRequestReview_RejectsFromInProgress(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 	_ = s.Heartbeat(ctx, "w1", claimed.ID)
 
@@ -101,7 +101,7 @@ func TestFinalizeTask_RejectsFromInProgress(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 	_ = s.Heartbeat(ctx, "w1", claimed.ID)
 

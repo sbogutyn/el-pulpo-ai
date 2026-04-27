@@ -20,6 +20,7 @@ type taskForm struct {
 	Priority     int
 	MaxAttempts  int
 	ScheduledFor string
+	Instructions string
 	Payload      string
 	JiraURL      string
 	GithubPRURL  string
@@ -132,7 +133,13 @@ func (s *Server) tasksCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := s.store.CreateTask(r.Context(), input); err != nil {
-		renderFormError(w, s, "tasks_new", formPageData{Title: "New task", Form: form, Error: err.Error()}, http.StatusInternalServerError)
+		msg := err.Error()
+		if errors.Is(err, store.ErrInvalidInput) {
+			// Surface to the form as a user-fixable error.
+			renderFormError(w, s, "tasks_new", formPageData{Title: "New task", Form: form, Error: msg}, http.StatusBadRequest)
+			return
+		}
+		renderFormError(w, s, "tasks_new", formPageData{Title: "New task", Form: form, Error: msg}, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/tasks", http.StatusSeeOther)
@@ -397,6 +404,7 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 	f := taskForm{
 		Name:         r.FormValue("name"),
 		ScheduledFor: r.FormValue("scheduled_for"),
+		Instructions: r.PostFormValue("instructions"),
 		Payload:      r.FormValue("payload"),
 		JiraURL:      strings.TrimSpace(r.FormValue("jira_url")),
 		GithubPRURL:  strings.TrimSpace(r.FormValue("github_pr_url")),
@@ -424,7 +432,25 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 	if !json.Valid([]byte(f.Payload)) {
 		return f, store.NewTaskInput{}, errors.New("payload must be valid JSON")
 	}
-	payloadJSON := json.RawMessage(f.Payload)
+
+	// Splice the instructions field into the payload object when provided.
+	// This mirrors the CLI behaviour: the textarea is a convenience wrapper
+	// around the canonical payload.instructions key.
+	var payloadJSON json.RawMessage
+	if f.Instructions != "" {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(f.Payload), &obj); err != nil {
+			return f, store.NewTaskInput{}, errors.New("payload must be valid JSON")
+		}
+		obj["instructions"] = f.Instructions
+		merged, err := json.Marshal(obj)
+		if err != nil {
+			return f, store.NewTaskInput{}, errors.New("failed to merge instructions into payload")
+		}
+		payloadJSON = json.RawMessage(merged)
+	} else {
+		payloadJSON = json.RawMessage(f.Payload)
+	}
 
 	var jiraPtr, prPtr *string
 	if f.JiraURL != "" {
@@ -462,10 +488,11 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 
 func formFromTask(t store.Task) taskForm {
 	tf := taskForm{
-		Name:        t.Name,
-		Priority:    t.Priority,
-		MaxAttempts: t.MaxAttempts,
-		Payload:     string(t.Payload),
+		Name:         t.Name,
+		Priority:     t.Priority,
+		MaxAttempts:  t.MaxAttempts,
+		Payload:      string(t.Payload),
+		Instructions: instructionsFrom(t.Payload),
 	}
 	if t.ScheduledFor != nil {
 		tf.ScheduledFor = t.ScheduledFor.In(time.Local).Format("2006-01-02T15:04")

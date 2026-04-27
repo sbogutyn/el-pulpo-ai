@@ -11,7 +11,7 @@ func TestSetJiraURL_AllowedFromClaimedAndInProgress(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	// claimed -> set_jira_url
@@ -40,7 +40,7 @@ func TestSetJiraURL_RejectsNonOwner(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	if err := s.SetJiraURL(ctx, "w2", claimed.ID, "https://jira/T-X"); err != ErrNotOwner {
@@ -54,7 +54,7 @@ func TestSetJiraURL_RejectsFromPending(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 
 	if err := s.SetJiraURL(ctx, "w1", created.ID, "https://jira/T-X"); err != ErrNotOwner {
 		// pending tasks have no claimed_by, so the owner guard fails first.
@@ -68,7 +68,7 @@ func TestSetJiraURL_RefreshesHeartbeat(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	before, _ := s.GetTask(ctx, claimed.ID)

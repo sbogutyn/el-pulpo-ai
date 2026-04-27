@@ -21,7 +21,7 @@ func TestReaper_ReclaimsStaleTasks(t *testing.T) {
 		t.Fatalf("TRUNCATE: %v", err)
 	}
 
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	claimed, err := s.ClaimTask(ctx, "w")
@@ -69,7 +69,7 @@ func TestReapStale_DoesNotReapParkedStates(t *testing.T) {
 		t.Fatalf("TRUNCATE: %v", err)
 	}
 
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	claimed, err := s.ClaimTask(ctx, "w1")

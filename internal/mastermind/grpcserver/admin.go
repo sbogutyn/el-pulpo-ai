@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -27,28 +25,6 @@ func NewAdmin(s *store.Store) *AdminServer { return &AdminServer{store: s} }
 
 const maxNameLen = 200
 
-// validateInstructions ensures the create-time payload carries a non-empty
-// `instructions` text. The text is the canonical "what should the agent do"
-// surface; the rest of the payload remains opaque.
-func validateInstructions(payload []byte) error {
-	if len(payload) == 0 {
-		return errors.New(`payload.instructions must be a non-empty string`)
-	}
-	var v struct {
-		Instructions *string `json:"instructions"`
-	}
-	if err := json.Unmarshal(payload, &v); err != nil {
-		return fmt.Errorf("payload is not valid JSON: %w", err)
-	}
-	if v.Instructions == nil {
-		return errors.New(`payload.instructions must be a non-empty string`)
-	}
-	if strings.TrimSpace(*v.Instructions) == "" {
-		return errors.New(`payload.instructions must be a non-empty string`)
-	}
-	return nil
-}
-
 func (a *AdminServer) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) (*pb.CreateTaskResponse, error) {
 	name := req.GetName()
 	if name == "" {
@@ -68,9 +44,6 @@ func (a *AdminServer) CreateTask(ctx context.Context, req *pb.CreateTaskRequest)
 		if err := json.Unmarshal(payload, &tmp); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "payload is not valid JSON: %v", err)
 		}
-	}
-	if err := validateInstructions(payload); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	in := store.NewTaskInput{
@@ -92,6 +65,9 @@ func (a *AdminServer) CreateTask(ctx context.Context, req *pb.CreateTaskRequest)
 
 	t, err := a.store.CreateTask(ctx, in)
 	if err != nil {
+		if errors.Is(err, store.ErrInvalidInput) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 		return nil, status.Errorf(codes.Internal, "create: %v", err)
 	}
 	return &pb.CreateTaskResponse{Task: toTaskDetail(t)}, nil
@@ -208,7 +184,7 @@ func (a *AdminServer) CancelTask(ctx context.Context, req *pb.CancelTaskRequest)
 	case errors.Is(err, store.ErrNotFound):
 		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
 	case errors.Is(err, store.ErrNotDeletable):
-		return nil, status.Error(codes.FailedPrecondition, "cannot cancel an active task (claimed or in_progress)")
+		return nil, status.Error(codes.FailedPrecondition, "cannot cancel an active or parked task (claimed, in_progress, pr_opened, or review_requested)")
 	default:
 		return nil, status.Errorf(codes.Internal, "cancel: %v", err)
 	}
@@ -226,7 +202,7 @@ func (a *AdminServer) RetryTask(ctx context.Context, req *pb.RetryTaskRequest) (
 	case errors.Is(err, store.ErrNotFound):
 		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
 	case errors.Is(err, store.ErrNotRequeueable):
-		return nil, status.Error(codes.FailedPrecondition, "cannot retry an active task (claimed or in_progress)")
+		return nil, status.Error(codes.FailedPrecondition, "cannot retry an active or parked task; finalize parked tasks first (claimed, in_progress, pr_opened, or review_requested)")
 	default:
 		return nil, status.Errorf(codes.Internal, "retry: %v", err)
 	}

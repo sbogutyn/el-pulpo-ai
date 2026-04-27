@@ -57,7 +57,7 @@ func TestClaimThenReport_Success(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
 
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	resp, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
@@ -80,7 +80,7 @@ func TestClaimThenReport_Success(t *testing.T) {
 func TestHeartbeat_WrongOwner_FailsPrecondition(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	resp, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
@@ -97,7 +97,7 @@ func TestHeartbeat_WrongOwner_FailsPrecondition(t *testing.T) {
 func TestUpdateProgress_StoresNote(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	resp, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
@@ -114,7 +114,7 @@ func TestUpdateProgress_StoresNote(t *testing.T) {
 func TestUpdateProgress_WrongOwner_FailsPrecondition(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	resp, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
@@ -153,7 +153,7 @@ func TestSetJiraURL_HappyPath(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
 
-	created, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestSetJiraURL_NotOwnerReturnsFailedPrecondition(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
 
-	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	_, _ = client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
 
 	_, err := client.SetJiraURL(ctx, &pb.SetJiraURLRequest{
@@ -215,7 +215,7 @@ func TestOpenPR_HappyPath(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
 
-	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	_, _ = client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
 	if _, err := client.Heartbeat(ctx, &pb.HeartbeatRequest{
 		WorkerId: "w1",
@@ -249,7 +249,7 @@ func TestOpenPR_NotOwnerReturnsFailedPrecondition(t *testing.T) {
 	client, s := startBufServer(t)
 	ctx := context.Background()
 
-	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	_, _ = client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
 	_, _ = client.Heartbeat(ctx, &pb.HeartbeatRequest{
 		WorkerId: "w1", TaskId: created.ID.String(),

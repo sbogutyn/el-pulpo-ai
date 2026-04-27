@@ -11,7 +11,7 @@ func TestOpenPR_HappyPath(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 	_ = s.Heartbeat(ctx, "w1", claimed.ID) // claimed -> in_progress
 
@@ -36,7 +36,7 @@ func TestOpenPR_RejectsFromClaimed(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1") // status=claimed, no heartbeat yet
 
 	if err := s.OpenPR(ctx, "w1", claimed.ID, "https://github.com/o/r/pull/1"); err != ErrNotOwner {
@@ -50,7 +50,7 @@ func TestOpenPR_RejectsNonOwner(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 	_ = s.Heartbeat(ctx, "w1", claimed.ID)
 
@@ -65,7 +65,7 @@ func TestOpenPR_EmptyURLReturnsError(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 	_ = s.Heartbeat(ctx, "w1", claimed.ID)
 

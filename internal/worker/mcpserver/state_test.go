@@ -116,6 +116,7 @@ func seedTask(t *testing.T, fx *workerFixture, name string) uuid.UUID {
 	created, err := fx.store.CreateTask(context.Background(), store.NewTaskInput{
 		Name:        name,
 		MaxAttempts: 3,
+		Payload:     []byte(`{"instructions":"test"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)

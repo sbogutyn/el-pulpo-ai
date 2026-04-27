@@ -17,7 +17,7 @@ service TaskService {
   rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse);
 
   // Heartbeat renews the caller's lease on a previously claimed task. The
-  // first heartbeat transitions the task from `claimed` to `running`;
+  // first heartbeat transitions the task from `claimed` to `in_progress`;
   // subsequent heartbeats refresh its last-seen timestamp. Returns
   // FAILED_PRECONDITION when the caller no longer owns the claim.
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
@@ -187,14 +187,15 @@ service AdminService {
 
   // CancelTask removes a task. Only allowed when the task is pending,
   // completed, or failed; returns FAILED_PRECONDITION while it is active
-  // (claimed or running) because an operator cannot safely unilaterally
-  // abandon work that a worker still holds. NOT_FOUND when id is unknown.
+  // (claimed or in_progress) or parked (pr_opened or review_requested)
+  // because an operator cannot safely unilaterally abandon such work.
+  // NOT_FOUND when id is unknown.
   rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
 
   // RetryTask resets a task back to `pending` with attempt_count=0, clearing
   // claim state and any previous failure. Allowed from pending, completed,
-  // or failed. Returns FAILED_PRECONDITION while the task is claimed or
-  // running.
+  // or failed. Returns FAILED_PRECONDITION while the task is claimed,
+  // in_progress, pr_opened, or review_requested.
   rpc RetryTask(RetryTaskRequest) returns (RetryTaskResponse);
 
   // RequestReview transitions a `pr_opened` task to `review_requested`.
@@ -296,7 +297,7 @@ message WorkerInfo {
   // claimed_by value used by this worker.
   string id = 1;
 
-  // Number of tasks currently in `claimed` or `running` state that are
+  // Number of tasks currently in `claimed` or `in_progress` state that are
   // owned by this worker.
   int32 active_tasks = 2;
 

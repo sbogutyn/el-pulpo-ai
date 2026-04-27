@@ -59,10 +59,10 @@ func TestDashboard_Fragment_ShowsQueueAndWorkers(t *testing.T) {
 	defer s.Close()
 
 	ctx := context.Background()
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "high-prio-task", Priority: 9, MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "high-prio-task", Priority: 9, MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
-	created, err := s.CreateTask(ctx, store.NewTaskInput{Name: "to-be-claimed", Priority: 5, MaxAttempts: 3})
+	created, err := s.CreateTask(ctx, store.NewTaskInput{Name: "to-be-claimed", Priority: 5, MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestAgentDetail_RendersPageAndFragment(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "summarize-call-transcripts", Priority: 5, MaxAttempts: 3}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "summarize-call-transcripts", Priority: 5, MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	claimed, err := s.ClaimTask(ctx, "orca-01")
@@ -281,7 +281,7 @@ func TestAgentDetail_HandlesURLEncodedID(t *testing.T) {
 		t.Fatalf("truncate: %v", err)
 	}
 	ctx := context.Background()
-	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "x"}); err != nil {
+	if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "x", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	if _, err := s.ClaimTask(ctx, "weird id/with slash"); err != nil {

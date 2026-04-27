@@ -35,7 +35,7 @@ func TestE2E_100TasksAreEachRunOnce(t *testing.T) {
 
 	const N = 100
 	for i := 0; i < N; i++ {
-		if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3}); err != nil {
+		if _, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 			t.Fatal(err)
 		}
 	}

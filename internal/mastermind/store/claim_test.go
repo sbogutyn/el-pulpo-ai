@@ -13,7 +13,7 @@ func TestClaimTask_ReturnsPendingTask(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 
 	claimed, err := s.ClaimTask(ctx, "worker-1")
 	if err != nil {
@@ -58,7 +58,7 @@ func TestClaimTask_SkipsScheduledFuture(t *testing.T) {
 	truncate(t, s.pool)
 
 	future := time.Now().Add(time.Hour)
-	if _, err := s.CreateTask(ctx, NewTaskInput{Name: "future", MaxAttempts: 3, ScheduledFor: &future}); err != nil {
+	if _, err := s.CreateTask(ctx, NewTaskInput{Name: "future", MaxAttempts: 3, ScheduledFor: &future, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.ClaimTask(ctx, "w")
@@ -73,8 +73,8 @@ func TestClaimTask_HonorsPriority(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	low, _ := s.CreateTask(ctx, NewTaskInput{Name: "low", Priority: 1, MaxAttempts: 3})
-	hi, _ := s.CreateTask(ctx, NewTaskInput{Name: "hi", Priority: 10, MaxAttempts: 3})
+	low, _ := s.CreateTask(ctx, NewTaskInput{Name: "low", Priority: 1, MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
+	hi, _ := s.CreateTask(ctx, NewTaskInput{Name: "hi", Priority: 10, MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	_ = low
 
 	got, err := s.ClaimTask(ctx, "w")
@@ -95,7 +95,7 @@ func TestClaimTask_ExactlyOnceUnderConcurrency(t *testing.T) {
 	const N = 100
 	ids := make(map[string]struct{}, N)
 	for i := 0; i < N; i++ {
-		tsk, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+		tsk, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 		ids[tsk.ID.String()] = struct{}{}
 	}
 

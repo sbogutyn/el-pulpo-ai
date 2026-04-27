@@ -42,7 +42,7 @@ type TaskServiceClient interface {
 	// real failure to log.
 	ClaimTask(ctx context.Context, in *ClaimTaskRequest, opts ...grpc.CallOption) (*ClaimTaskResponse, error)
 	// Heartbeat renews the caller's lease on a previously claimed task. The
-	// first heartbeat transitions the task from `claimed` to `running`;
+	// first heartbeat transitions the task from `claimed` to `in_progress`;
 	// subsequent heartbeats refresh its last-seen timestamp. Returns
 	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
@@ -167,7 +167,7 @@ type TaskServiceServer interface {
 	// real failure to log.
 	ClaimTask(context.Context, *ClaimTaskRequest) (*ClaimTaskResponse, error)
 	// Heartbeat renews the caller's lease on a previously claimed task. The
-	// first heartbeat transitions the task from `claimed` to `running`;
+	// first heartbeat transitions the task from `claimed` to `in_progress`;
 	// subsequent heartbeats refresh its last-seen timestamp. Returns
 	// FAILED_PRECONDITION when the caller no longer owns the claim.
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
@@ -448,13 +448,14 @@ type AdminServiceClient interface {
 	ListTaskLogs(ctx context.Context, in *ListTaskLogsRequest, opts ...grpc.CallOption) (*ListTaskLogsResponse, error)
 	// CancelTask removes a task. Only allowed when the task is pending,
 	// completed, or failed; returns FAILED_PRECONDITION while it is active
-	// (claimed or running) because an operator cannot safely unilaterally
-	// abandon work that a worker still holds. NOT_FOUND when id is unknown.
+	// (claimed or in_progress) or parked (pr_opened or review_requested)
+	// because an operator cannot safely unilaterally abandon such work.
+	// NOT_FOUND when id is unknown.
 	CancelTask(ctx context.Context, in *CancelTaskRequest, opts ...grpc.CallOption) (*CancelTaskResponse, error)
 	// RetryTask resets a task back to `pending` with attempt_count=0, clearing
 	// claim state and any previous failure. Allowed from pending, completed,
-	// or failed. Returns FAILED_PRECONDITION while the task is claimed or
-	// running.
+	// or failed. Returns FAILED_PRECONDITION while the task is claimed,
+	// in_progress, pr_opened, or review_requested.
 	RetryTask(ctx context.Context, in *RetryTaskRequest, opts ...grpc.CallOption) (*RetryTaskResponse, error)
 	// RequestReview transitions a `pr_opened` task to `review_requested`.
 	// FAILED_PRECONDITION from any other state.
@@ -588,13 +589,14 @@ type AdminServiceServer interface {
 	ListTaskLogs(context.Context, *ListTaskLogsRequest) (*ListTaskLogsResponse, error)
 	// CancelTask removes a task. Only allowed when the task is pending,
 	// completed, or failed; returns FAILED_PRECONDITION while it is active
-	// (claimed or running) because an operator cannot safely unilaterally
-	// abandon work that a worker still holds. NOT_FOUND when id is unknown.
+	// (claimed or in_progress) or parked (pr_opened or review_requested)
+	// because an operator cannot safely unilaterally abandon such work.
+	// NOT_FOUND when id is unknown.
 	CancelTask(context.Context, *CancelTaskRequest) (*CancelTaskResponse, error)
 	// RetryTask resets a task back to `pending` with attempt_count=0, clearing
 	// claim state and any previous failure. Allowed from pending, completed,
-	// or failed. Returns FAILED_PRECONDITION while the task is claimed or
-	// running.
+	// or failed. Returns FAILED_PRECONDITION while the task is claimed,
+	// in_progress, pr_opened, or review_requested.
 	RetryTask(context.Context, *RetryTaskRequest) (*RetryTaskResponse, error)
 	// RequestReview transitions a `pr_opened` task to `review_requested`.
 	// FAILED_PRECONDITION from any other state.

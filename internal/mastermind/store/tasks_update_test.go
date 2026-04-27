@@ -14,7 +14,7 @@ func TestUpdateTask_OnlyWhilePending(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 
 	sched := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
 	upd, err := s.UpdateTask(ctx, created.ID, UpdateTaskInput{
@@ -43,7 +43,7 @@ func TestDeleteTask_NotAllowedWhileActive(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	// Simulate a claim.
 	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='claimed', claimed_by='w', claimed_at=now(), last_heartbeat_at=now() WHERE id=$1`, created.ID); err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestRequeueTask(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='failed', last_error='boom', attempt_count=3 WHERE id=$1`, created.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestUpdateTaskLinks_WorksInAnyStatus(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "x", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 
 	// Force a status where UpdateTask would fail.
 	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='failed' WHERE id=$1`, created.ID); err != nil {
@@ -140,6 +140,7 @@ func TestUpdateTaskLinks_NilClears(t *testing.T) {
 	pr := "https://github.com/acme/widget/pull/42"
 	created, _ := s.CreateTask(ctx, NewTaskInput{
 		Name: "x", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+		Payload: []byte(`{"instructions":"test"}`),
 	})
 
 	upd, err := s.UpdateTaskLinks(ctx, created.ID, nil, nil)
@@ -176,6 +177,7 @@ func TestRequeueTask_PreservesIssueRefs(t *testing.T) {
 	pr := "https://github.com/acme/widget/pull/5"
 	created, _ := s.CreateTask(ctx, NewTaskInput{
 		Name: "x", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+		Payload: []byte(`{"instructions":"test"}`),
 	})
 	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='failed' WHERE id=$1`, created.ID); err != nil {
 		t.Fatal(err)
@@ -201,7 +203,7 @@ func TestRequeueTask_ClearsGithubPRURL(t *testing.T) {
 
 	pr := "https://github.com/o/r/pull/1"
 	jira := "https://jira/T-1"
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, GithubPRURL: &pr, JiraURL: &jira})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, GithubPRURL: &pr, JiraURL: &jira, Payload: []byte(`{"instructions":"test"}`)})
 	// Force the task into 'failed' so RequeueTask will accept it.
 	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='failed'`); err != nil {
 		t.Fatal(err)

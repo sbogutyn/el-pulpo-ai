@@ -36,6 +36,7 @@ func TestCreateAndListTask(t *testing.T) {
 		"name":         {"hello"},
 		"priority":     {"5"},
 		"max_attempts": {"3"},
+		"instructions": {"test instructions"},
 		"payload":      {`{"a":1}`},
 	}.Encode()
 
@@ -75,6 +76,7 @@ func TestCreateTask_WithIssueRefs(t *testing.T) {
 		"name":          {"with-refs"},
 		"priority":      {"0"},
 		"max_attempts":  {"3"},
+		"instructions":  {"test instructions"},
 		"payload":       {"{}"},
 		"jira_url":      {"https://acme.atlassian.net/browse/PROJ-1"},
 		"github_pr_url": {"https://github.com/acme/widget/pull/7"},
@@ -138,7 +140,7 @@ func TestDeleteTask(t *testing.T) {
 		t.Fatalf("store.Open: %v", err)
 	}
 	defer s.Close()
-	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "kill-me", MaxAttempts: 3})
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "kill-me", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -158,7 +160,7 @@ func TestUpdateLinks_WorksOnFailedTask(t *testing.T) {
 	}
 	defer s.Close()
 
-	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "x", MaxAttempts: 3})
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "x", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -194,7 +196,7 @@ func TestUpdateLinks_InvalidJira(t *testing.T) {
 	srv := newServer(t)
 	s, _ := store.Open(context.Background(), testDSN)
 	defer s.Close()
-	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{Name: "x", MaxAttempts: 3})
+	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{Name: "x", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 
 	form := url.Values{"jira_url": {"nope"}}.Encode()
 	rr := httptest.NewRecorder()
@@ -223,6 +225,7 @@ func TestUpdateLinks_EmptyFormClearsRefs(t *testing.T) {
 	pr := "https://github.com/acme/widget/pull/2"
 	task, err := s.CreateTask(context.Background(), store.NewTaskInput{
 		Name: "clear-refs", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+		Payload: []byte(`{"instructions":"test"}`),
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
@@ -256,6 +259,7 @@ func TestDetailPage_ShowsRefsAndUpdateForm(t *testing.T) {
 	pr := "https://github.com/acme/widget/pull/11"
 	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{
 		Name: "detail", MaxAttempts: 3, JiraURL: &jira, GithubPRURL: &pr,
+		Payload: []byte(`{"instructions":"test"}`),
 	})
 	// Force a non-pending status to prove the update form is still shown.
 	if _, err := s.Pool().Exec(context.Background(), `UPDATE tasks SET status='failed' WHERE id=$1`, task.ID); err != nil {
@@ -284,7 +288,7 @@ func TestDetailPage_ShowsProgressNote(t *testing.T) {
 	s, _ := store.Open(context.Background(), testDSN)
 	defer s.Close()
 
-	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{Name: "detail", MaxAttempts: 3})
+	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{Name: "detail", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if _, err := s.Pool().Exec(context.Background(),
 		`UPDATE tasks SET status='in_progress', claimed_by='w1', progress_note='step 2/3' WHERE id=$1`,
 		task.ID,
@@ -310,7 +314,7 @@ func TestDetailPage_ShowsProgressNote(t *testing.T) {
 // mirroring what OpenPR does atomically.
 func prOpenedTask(t *testing.T, s *store.Store) store.Task {
 	t.Helper()
-	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "parked", MaxAttempts: 3})
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "parked", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -371,7 +375,7 @@ func TestTasksRequestReview_RejectsFromInProgress(t *testing.T) {
 	}
 	defer s.Close()
 
-	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "in-progress", MaxAttempts: 3})
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "in-progress", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

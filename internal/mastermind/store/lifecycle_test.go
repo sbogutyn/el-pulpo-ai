@@ -12,7 +12,7 @@ func TestHeartbeat_TransitionsClaimedToInProgress(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 	_ = created
 
@@ -31,7 +31,7 @@ func TestHeartbeat_WrongOwnerFailsPrecondition(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	err := s.Heartbeat(ctx, "w2", claimed.ID)
@@ -46,7 +46,7 @@ func TestReportResult_Success(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	if _, err := s.ReportResult(ctx, "w1", claimed.ID, true, ""); err != nil {
@@ -68,7 +68,7 @@ func TestReportResult_FailureRetriesThenFails(t *testing.T) {
 	truncate(t, s.pool)
 
 	// max_attempts=2 so we can exhaust in two attempts.
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 2})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 2, Payload: []byte(`{"instructions":"test"}`)})
 
 	claim1, _ := s.ClaimTask(ctx, "w")
 	if _, err := s.ReportResult(ctx, "w", claim1.ID, false, "bad"); err != nil {
@@ -108,7 +108,7 @@ func TestReapStale(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w")
 	_ = created
 
@@ -139,7 +139,7 @@ func TestReapStale_ExhaustedGoesToFailed(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 1})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 1, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w") // attempt_count = 1
 	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET last_heartbeat_at = now() - interval '1 hour' WHERE id=$1`, claimed.ID); err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestReportResult_SuccessWrongOwnerFailsPrecondition(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	_, err := s.ReportResult(ctx, "w2", claimed.ID, true, "")
@@ -181,7 +181,7 @@ func TestReportResult_FailureWrongOwnerFailsPrecondition(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	_, err := s.ReportResult(ctx, "w2", claimed.ID, false, "bad")
@@ -206,7 +206,7 @@ func TestUpdateProgress_StoresNoteAndTransitionsInProgress(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	if err := s.UpdateProgress(ctx, "w1", claimed.ID, "step 1/3"); err != nil {
@@ -227,7 +227,7 @@ func TestUpdateProgress_EmptyNoteClears(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	_ = s.UpdateProgress(ctx, "w1", claimed.ID, "step 1")
@@ -246,7 +246,7 @@ func TestUpdateProgress_WrongOwnerFailsPrecondition(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	err := s.UpdateProgress(ctx, "w2", claimed.ID, "spying")
@@ -266,7 +266,7 @@ func TestClaimTask_ClearsPriorProgressNote(t *testing.T) {
 	truncate(t, s.pool)
 
 	// MaxAttempts=2 so the first failure retries.
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 2})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 2, Payload: []byte(`{"instructions":"test"}`)})
 	c1, _ := s.ClaimTask(ctx, "w1")
 	_ = s.UpdateProgress(ctx, "w1", c1.ID, "from attempt 1")
 	if _, err := s.ReportResult(ctx, "w1", c1.ID, false, "boom"); err != nil {

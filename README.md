@@ -138,7 +138,7 @@ Commands:
 | `elpulpo tasks create --name NAME [--instructions TEXT\|@file\|-] [flags]` | Enqueue a new task. Tasks created via gRPC require `payload.instructions`; `--instructions` is a convenience that wraps text into the canonical payload (mergeable with `--payload`). `--payload` accepts inline JSON, `@path` for a file, or `-` for stdin. |
 | `elpulpo tasks get <id>` | Show one task's full state. |
 | `elpulpo tasks list [flags]` | Table of tasks; filter with `--status`, paginate with `--limit`/`--offset`, emit JSON with `--json`. |
-| `elpulpo tasks cancel <id>` | Remove a task. Rejects tasks that are currently claimed or running. |
+| `elpulpo tasks cancel <id>` | Remove a task. Rejects tasks that are currently claimed, in_progress, pr_opened, or review_requested. |
 | `elpulpo tasks retry <id>` | Reset a pending/completed/failed task back to `pending` with a fresh attempt count. |
 | `elpulpo tasks request-review <id>` | Move a `pr_opened` task to `review_requested`. |
 | `elpulpo tasks finalize <id> --success` | Terminal admin completion of a parked task. |

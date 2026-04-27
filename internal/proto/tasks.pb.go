@@ -1882,7 +1882,7 @@ type WorkerInfo struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// claimed_by value used by this worker.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Number of tasks currently in `claimed` or `running` state that are
+	// Number of tasks currently in `claimed` or `in_progress` state that are
 	// owned by this worker.
 	ActiveTasks int32 `protobuf:"varint,2,opt,name=active_tasks,json=activeTasks,proto3" json:"active_tasks,omitempty"`
 	// Most recent heartbeat (or claim time, if the worker never heartbeated)

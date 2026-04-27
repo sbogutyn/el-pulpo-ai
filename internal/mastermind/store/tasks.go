@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +25,10 @@ const (
 )
 
 var ErrNotFound = errors.New("task: not found")
+
+// ErrInvalidInput is returned by CreateTask when the supplied input fails
+// validation (e.g. missing payload.instructions).
+var ErrInvalidInput = errors.New("task: invalid create input")
 
 type Task struct {
 	ID              uuid.UUID       `json:"id"`
@@ -77,7 +83,30 @@ func scanTask(row pgx.Row) (Task, error) {
 	return t, err
 }
 
+// validateCreateInput enforces invariants required at task creation time:
+// payload must contain a non-empty `instructions` string. Other invariants
+// (name length, max_attempts range) are still enforced by the gRPC handler.
+func validateCreateInput(in NewTaskInput) error {
+	payload := in.Payload
+	if len(payload) == 0 {
+		return errors.New(`payload.instructions must be a non-empty string`)
+	}
+	var v struct {
+		Instructions *string `json:"instructions"`
+	}
+	if err := json.Unmarshal(payload, &v); err != nil {
+		return fmt.Errorf("payload is not valid JSON: %w", err)
+	}
+	if v.Instructions == nil || strings.TrimSpace(*v.Instructions) == "" {
+		return errors.New(`payload.instructions must be a non-empty string`)
+	}
+	return nil
+}
+
 func (s *Store) CreateTask(ctx context.Context, in NewTaskInput) (Task, error) {
+	if err := validateCreateInput(in); err != nil {
+		return Task{}, fmt.Errorf("%w: %s", ErrInvalidInput, err.Error())
+	}
 	if in.MaxAttempts <= 0 {
 		in.MaxAttempts = 3
 	}
