@@ -265,6 +265,7 @@ func (s *Store) RequeueTask(ctx context.Context, id uuid.UUID) (Task, error) {
           completed_at      = NULL,
           last_error        = NULL,
           progress_note     = NULL,
+          github_pr_url     = NULL,
           attempt_count     = 0,
           scheduled_for     = NULL,
           updated_at        = now()

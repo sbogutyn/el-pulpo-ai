@@ -188,7 +188,71 @@ func TestRequeueTask_PreservesIssueRefs(t *testing.T) {
 	if reset.JiraURL == nil || *reset.JiraURL != jira {
 		t.Errorf("JiraURL wiped on requeue: %v", reset.JiraURL)
 	}
-	if reset.GithubPRURL == nil || *reset.GithubPRURL != pr {
-		t.Errorf("GithubPRURL wiped on requeue: %v", reset.GithubPRURL)
+	if reset.GithubPRURL != nil {
+		t.Errorf("GithubPRURL not wiped on requeue: %v", reset.GithubPRURL)
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func TestRequeueTask_ClearsGithubPRURL(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	pr := "https://github.com/o/r/pull/1"
+	jira := "https://jira/T-1"
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, GithubPRURL: &pr, JiraURL: &jira})
+	// Force the task into 'failed' so RequeueTask will accept it.
+	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='failed'`); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.ListTasks(ctx, ListTasksFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := list.Items[0].ID
+
+	out, err := s.RequeueTask(ctx, id)
+	if err != nil {
+		t.Fatalf("RequeueTask: %v", err)
+	}
+	if out.GithubPRURL != nil {
+		t.Errorf("github_pr_url=%v, want nil", out.GithubPRURL)
+	}
+	if out.JiraURL == nil || *out.JiraURL != jira {
+		t.Errorf("jira_url=%v, want preserved", out.JiraURL)
+	}
+}
+
+func TestRequeueTask_RejectsFromPROpened(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	parked := openedPR(t, s, ctx, "w1") // helper from finalize_test.go
+
+	_, err := s.RequeueTask(ctx, parked.ID)
+	if err != ErrNotRequeueable {
+		t.Errorf("got %v, want ErrNotRequeueable", err)
+	}
+}
+
+func TestRequeueTask_RejectsFromReviewRequested(t *testing.T) {
+	ctx := context.Background()
+	s, _ := Open(ctx, testDSN)
+	defer s.Close()
+	truncate(t, s.pool)
+
+	parked := openedPR(t, s, ctx, "w1")
+	_ = s.RequestReview(ctx, parked.ID)
+
+	_, err := s.RequeueTask(ctx, parked.ID)
+	if err != ErrNotRequeueable {
+		t.Errorf("got %v, want ErrNotRequeueable", err)
 	}
 }
