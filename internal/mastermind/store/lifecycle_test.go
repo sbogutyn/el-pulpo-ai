@@ -20,8 +20,8 @@ func TestHeartbeat_TransitionsClaimedToRunning(t *testing.T) {
 		t.Fatalf("Heartbeat: %v", err)
 	}
 	got, _ := s.GetTask(ctx, claimed.ID)
-	if got.Status != StatusRunning {
-		t.Errorf("status=%q, want running", got.Status)
+	if got.Status != StatusInProgress {
+		t.Errorf("status=%q, want in_progress", got.Status)
 	}
 }
 
@@ -213,8 +213,8 @@ func TestUpdateProgress_StoresNoteAndTransitionsRunning(t *testing.T) {
 		t.Fatalf("UpdateProgress: %v", err)
 	}
 	got, _ := s.GetTask(ctx, claimed.ID)
-	if got.Status != StatusRunning {
-		t.Errorf("status=%q, want running", got.Status)
+	if got.Status != StatusInProgress {
+		t.Errorf("status=%q, want in_progress", got.Status)
 	}
 	if got.ProgressNote == nil || *got.ProgressNote != "step 1/3" {
 		t.Errorf("progress_note=%v, want step 1/3", got.ProgressNote)

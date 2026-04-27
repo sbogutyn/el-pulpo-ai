@@ -128,11 +128,13 @@ func (a *AdminServer) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.
 }
 
 var knownStatuses = map[string]store.TaskStatus{
-	"pending":   store.StatusPending,
-	"claimed":   store.StatusClaimed,
-	"running":   store.StatusRunning,
-	"completed": store.StatusCompleted,
-	"failed":    store.StatusFailed,
+	"pending":          store.StatusPending,
+	"claimed":          store.StatusClaimed,
+	"in_progress":      store.StatusInProgress,
+	"pr_opened":        store.StatusPROpened,
+	"review_requested": store.StatusReviewRequested,
+	"completed":        store.StatusCompleted,
+	"failed":           store.StatusFailed,
 }
 
 func (a *AdminServer) ListTaskLogs(ctx context.Context, req *pb.ListTaskLogsRequest) (*pb.ListTaskLogsResponse, error) {
@@ -179,7 +181,7 @@ func (a *AdminServer) CancelTask(ctx context.Context, req *pb.CancelTaskRequest)
 	case errors.Is(err, store.ErrNotFound):
 		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
 	case errors.Is(err, store.ErrNotDeletable):
-		return nil, status.Error(codes.FailedPrecondition, "cannot cancel an active task (claimed or running)")
+		return nil, status.Error(codes.FailedPrecondition, "cannot cancel an active task (claimed or in_progress)")
 	default:
 		return nil, status.Errorf(codes.Internal, "cancel: %v", err)
 	}
@@ -197,7 +199,7 @@ func (a *AdminServer) RetryTask(ctx context.Context, req *pb.RetryTaskRequest) (
 	case errors.Is(err, store.ErrNotFound):
 		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
 	case errors.Is(err, store.ErrNotRequeueable):
-		return nil, status.Error(codes.FailedPrecondition, "cannot retry an active task (claimed or running)")
+		return nil, status.Error(codes.FailedPrecondition, "cannot retry an active task (claimed or in_progress)")
 	default:
 		return nil, status.Errorf(codes.Internal, "retry: %v", err)
 	}

@@ -97,7 +97,15 @@ func (s *Server) buildListData(r *http.Request) listPageData {
 		Title:         "Tasks",
 		Items:         page.Items,
 		Total:         page.Total,
-		Statuses:      []store.TaskStatus{store.StatusPending, store.StatusClaimed, store.StatusRunning, store.StatusCompleted, store.StatusFailed},
+		Statuses: []store.TaskStatus{
+			store.StatusPending,
+			store.StatusClaimed,
+			store.StatusInProgress,
+			store.StatusPROpened,
+			store.StatusReviewRequested,
+			store.StatusCompleted,
+			store.StatusFailed,
+		},
 		CurrentStatus: status,
 	}
 }

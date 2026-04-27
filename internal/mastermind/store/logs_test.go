@@ -30,8 +30,8 @@ func TestAppendTaskLog_OwnerAppendsAndReadsBack(t *testing.T) {
 	// Appending should also refresh the lease (tasks.last_heartbeat_at) and
 	// transition claimed -> running.
 	got, _ := s.GetTask(ctx, claimed.ID)
-	if got.Status != StatusRunning {
-		t.Errorf("status=%q, want running", got.Status)
+	if got.Status != StatusInProgress {
+		t.Errorf("status=%q, want in_progress", got.Status)
 	}
 
 	logs, err := s.ListTaskLogs(ctx, claimed.ID, 0)

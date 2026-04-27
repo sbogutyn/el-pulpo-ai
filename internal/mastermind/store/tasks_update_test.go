@@ -92,7 +92,7 @@ func TestRequeueTask(t *testing.T) {
 	}
 
 	// Requeue while active should be rejected.
-	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='running' WHERE id=$1`, created.ID); err != nil {
+	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET status='in_progress' WHERE id=$1`, created.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.RequeueTask(ctx, created.ID); err != ErrNotRequeueable {

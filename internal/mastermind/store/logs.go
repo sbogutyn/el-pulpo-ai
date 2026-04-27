@@ -45,7 +45,7 @@ func (s *Store) AppendTaskLog(
 	if err != nil {
 		return TaskLogEntry{}, err
 	}
-	if owner == nil || *owner != workerID || (st != StatusClaimed && st != StatusRunning) {
+	if owner == nil || *owner != workerID || (st != StatusClaimed && st != StatusInProgress) {
 		return TaskLogEntry{}, ErrNotOwner
 	}
 
@@ -62,7 +62,7 @@ func (s *Store) AppendTaskLog(
 	if _, err := tx.Exec(ctx, `
       UPDATE tasks
       SET last_heartbeat_at = now(),
-          status            = CASE WHEN status = 'claimed' THEN 'running' ELSE status END,
+          status            = CASE WHEN status = 'claimed' THEN 'in_progress' ELSE status END,
           updated_at        = now()
       WHERE id = $1
     `, taskID); err != nil {

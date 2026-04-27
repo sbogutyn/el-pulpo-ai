@@ -13,11 +13,13 @@ import (
 type TaskStatus string
 
 const (
-	StatusPending   TaskStatus = "pending"
-	StatusClaimed   TaskStatus = "claimed"
-	StatusRunning   TaskStatus = "running"
-	StatusCompleted TaskStatus = "completed"
-	StatusFailed    TaskStatus = "failed"
+	StatusPending         TaskStatus = "pending"
+	StatusClaimed         TaskStatus = "claimed"
+	StatusInProgress      TaskStatus = "in_progress"
+	StatusPROpened        TaskStatus = "pr_opened"
+	StatusReviewRequested TaskStatus = "review_requested"
+	StatusCompleted       TaskStatus = "completed"
+	StatusFailed          TaskStatus = "failed"
 )
 
 var ErrNotFound = errors.New("task: not found")
@@ -176,7 +178,7 @@ var (
 // succeeds while a task is still pending. JiraURL and GithubPRURL are
 // included here so the pending-only edit form can set them alongside the
 // other fields; for attaching or changing refs after a task has run
-// (running/completed/failed), use UpdateTaskLinks instead.
+// (in_progress/completed/failed), use UpdateTaskLinks instead.
 type UpdateTaskInput struct {
 	Name         string
 	Priority     int

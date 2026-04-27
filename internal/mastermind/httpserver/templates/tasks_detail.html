@@ -59,7 +59,7 @@
       <button type="submit">Requeue</button>
     </form>
   {{ end }}
-  {{ if ne .Task.Status "claimed" }}{{ if ne .Task.Status "running" }}
+  {{ if ne .Task.Status "claimed" }}{{ if ne .Task.Status "in_progress" }}
     <form method="post" action="/tasks/{{ .Task.ID }}/delete"
           onsubmit="return confirm('Delete this task?');">
       <button type="submit" class="contrast">Delete</button>

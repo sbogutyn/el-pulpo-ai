@@ -92,7 +92,7 @@ func isStaleWorker(now time.Time, lastSeen *time.Time, staleAfter time.Duration)
 }
 
 // activeTasksByWorker returns one Task per worker that is currently holding a
-// claimed/running task. If a worker somehow holds more than one (shouldn't
+// claimed/in_progress task. If a worker somehow holds more than one (shouldn't
 // happen — one-claim-at-a-time is enforced at claim time), the most recently
 // claimed wins.
 func (s *Store) activeTasksByWorker(ctx context.Context) (map[string]Task, error) {
@@ -100,7 +100,7 @@ func (s *Store) activeTasksByWorker(ctx context.Context) (map[string]Task, error
         SELECT `+taskColumns+`
           FROM tasks
          WHERE claimed_by IS NOT NULL
-           AND status IN ('claimed','running')
+           AND status IN ('claimed','in_progress')
          ORDER BY claimed_at DESC NULLS LAST
     `)
 	if err != nil {

@@ -286,7 +286,7 @@ func TestDetailPage_ShowsProgressNote(t *testing.T) {
 
 	task, _ := s.CreateTask(context.Background(), store.NewTaskInput{Name: "detail", MaxAttempts: 3})
 	if _, err := s.Pool().Exec(context.Background(),
-		`UPDATE tasks SET status='running', claimed_by='w1', progress_note='step 2/3' WHERE id=$1`,
+		`UPDATE tasks SET status='in_progress', claimed_by='w1', progress_note='step 2/3' WHERE id=$1`,
 		task.ID,
 	); err != nil {
 		t.Fatal(err)
