@@ -27,7 +27,7 @@ func TestGetAgentDetail_AggregatesMetadata(t *testing.T) {
 	// Worker has 3 historical tasks: completed, failed (terminal), and one
 	// currently in flight.
 	for range 3 {
-		if _, err := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 1}); err != nil {
+		if _, err := s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 1, Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 			t.Fatalf("CreateTask: %v", err)
 		}
 	}
@@ -88,7 +88,7 @@ func TestGetAgentDetail_LogTailLimit(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	if _, err := s.CreateTask(ctx, NewTaskInput{Name: "t"}); err != nil {
+	if _, err := s.CreateTask(ctx, NewTaskInput{Name: "t", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	claimed, _ := s.ClaimTask(ctx, "finch-02")

@@ -29,7 +29,7 @@ func (s *Store) ListWorkers(ctx context.Context) ([]WorkerInfo, error) {
 	rows, err := s.pool.Query(ctx, `
         SELECT
           claimed_by AS id,
-          COUNT(*) FILTER (WHERE status IN ('claimed','running'))     AS active_tasks,
+          COUNT(*) FILTER (WHERE status IN ('claimed','in_progress'))     AS active_tasks,
           COUNT(*) FILTER (WHERE status = 'completed')                AS completed_tasks,
           COUNT(*) FILTER (WHERE status = 'failed')                   AS failed_tasks,
           MAX(COALESCE(last_heartbeat_at, claimed_at, completed_at))  AS last_seen_at

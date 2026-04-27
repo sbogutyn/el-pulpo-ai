@@ -137,3 +137,43 @@ func (s *Server) ReportResult(ctx context.Context, req *pb.ReportResultRequest) 
 	// finally lands in the failed state.
 	return &pb.ReportResultResponse{}, nil
 }
+
+func (s *Server) SetJiraURL(ctx context.Context, req *pb.SetJiraURLRequest) (*pb.SetJiraURLResponse, error) {
+	if req.GetWorkerId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
+	}
+	id, err := uuid.Parse(req.GetTaskId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "task_id must be a UUID")
+	}
+	if err := s.store.SetJiraURL(ctx, req.GetWorkerId(), id, req.GetUrl()); err != nil {
+		if errors.Is(err, store.ErrNotOwner) {
+			return nil, status.Error(codes.FailedPrecondition, "not the current owner of this task")
+		}
+		return nil, status.Errorf(codes.Internal, "set_jira_url: %v", err)
+	}
+	return &pb.SetJiraURLResponse{}, nil
+}
+
+func (s *Server) OpenPR(ctx context.Context, req *pb.OpenPRRequest) (*pb.OpenPRResponse, error) {
+	if req.GetWorkerId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "worker_id is required")
+	}
+	if req.GetGithubPrUrl() == "" {
+		return nil, status.Error(codes.InvalidArgument, "github_pr_url is required")
+	}
+	id, err := uuid.Parse(req.GetTaskId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "task_id must be a UUID")
+	}
+	if err := s.store.OpenPR(ctx, req.GetWorkerId(), id, req.GetGithubPrUrl()); err != nil {
+		if errors.Is(err, store.ErrNotOwner) {
+			return nil, status.Error(codes.FailedPrecondition, "not the current owner of this task or task not in_progress")
+		}
+		if errors.Is(err, store.ErrEmptyPRURL) {
+			return nil, status.Error(codes.InvalidArgument, "github_pr_url is required")
+		}
+		return nil, status.Errorf(codes.Internal, "open_pr: %v", err)
+	}
+	return &pb.OpenPRResponse{}, nil
+}

@@ -12,9 +12,9 @@ func TestGetDashboard_QueueOrderedByPriority(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	low, _ := s.CreateTask(ctx, NewTaskInput{Name: "low", Priority: 1})
-	high, _ := s.CreateTask(ctx, NewTaskInput{Name: "high", Priority: 10})
-	mid, _ := s.CreateTask(ctx, NewTaskInput{Name: "mid", Priority: 5})
+	low, _ := s.CreateTask(ctx, NewTaskInput{Name: "low", Priority: 1, Payload: []byte(`{"instructions":"test"}`)})
+	high, _ := s.CreateTask(ctx, NewTaskInput{Name: "high", Priority: 10, Payload: []byte(`{"instructions":"test"}`)})
+	mid, _ := s.CreateTask(ctx, NewTaskInput{Name: "mid", Priority: 5, Payload: []byte(`{"instructions":"test"}`)})
 
 	snap, err := s.GetDashboard(ctx, 0, 0)
 	if err != nil {
@@ -44,7 +44,7 @@ func TestGetDashboard_AssignsCurrentTaskAndLogs(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "do-thing", Priority: 5})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "do-thing", Priority: 5, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, err := s.ClaimTask(ctx, "worker-A")
 	if err != nil || claimed == nil || claimed.ID != created.ID {
 		t.Fatalf("setup claim: %v %v", err, claimed)
@@ -87,7 +87,7 @@ func TestGetDashboard_IdleWorkerHasNoCurrent(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "one-shot"})
+	created, _ := s.CreateTask(ctx, NewTaskInput{Name: "one-shot", Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "worker-Z")
 	if claimed == nil {
 		t.Fatal("expected claim")
@@ -120,7 +120,7 @@ func TestGetDashboard_StaleAfterDropsOldWorkers(t *testing.T) {
 	truncate(t, s.pool)
 
 	// One "fresh" worker that just completed a task — its last_seen_at is now.
-	if _, err := s.CreateTask(ctx, NewTaskInput{Name: "fresh-task"}); err != nil {
+	if _, err := s.CreateTask(ctx, NewTaskInput{Name: "fresh-task", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 	freshClaim, _ := s.ClaimTask(ctx, "worker-fresh")
@@ -133,7 +133,7 @@ func TestGetDashboard_StaleAfterDropsOldWorkers(t *testing.T) {
 
 	// One "stale" worker whose only task we backdate so its derived last_seen_at
 	// falls outside the window.
-	staleTask, _ := s.CreateTask(ctx, NewTaskInput{Name: "stale-task"})
+	staleTask, _ := s.CreateTask(ctx, NewTaskInput{Name: "stale-task", Payload: []byte(`{"instructions":"test"}`)})
 	staleClaim, _ := s.ClaimTask(ctx, "worker-stale")
 	if staleClaim == nil {
 		t.Fatal("expected stale claim")

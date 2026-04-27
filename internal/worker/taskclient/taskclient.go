@@ -132,6 +132,33 @@ func (t *Task) AppendLog(ctx context.Context, message string) (int64, error) {
 	return resp.GetId(), nil
 }
 
+// SetJiraURL attaches a JIRA URL to the task and refreshes the lease.
+// Allowed any time the worker holds the claim (claimed or in_progress).
+func (t *Task) SetJiraURL(ctx context.Context, url string) error {
+	_, err := t.rpc.SetJiraURL(ctx, &pb.SetJiraURLRequest{
+		WorkerId: t.workerID,
+		TaskId:   t.id,
+		Url:      url,
+	})
+	return err
+}
+
+// OpenPR atomically transitions the task to pr_opened, sets github_pr_url,
+// and releases the caller's claim. After this call the Task is "finalized"
+// in the same sense as Complete/Fail: subsequent lifecycle calls return
+// ErrAlreadyFinalized. The auto-heartbeat (if running) is stopped.
+func (t *Task) OpenPR(ctx context.Context, githubPRURL string) error {
+	if err := t.markFinalized(); err != nil {
+		return err
+	}
+	_, err := t.rpc.OpenPR(ctx, &pb.OpenPRRequest{
+		WorkerId:    t.workerID,
+		TaskId:      t.id,
+		GithubPrUrl: githubPRURL,
+	})
+	return err
+}
+
 // Complete finalizes the task as successful. Subsequent calls return
 // [ErrAlreadyFinalized]. Any running auto-heartbeat is stopped before the
 // RPC so it can't race the server-side terminal transition.

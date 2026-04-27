@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/sbogutyn/el-pulpo-ai/internal/mastermind/store"
 	pb "github.com/sbogutyn/el-pulpo-ai/internal/proto"
 )
 
@@ -34,7 +35,7 @@ func TestCreateTaskTool_Happy(t *testing.T) {
 
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "create_task",
-		Arguments: map[string]any{"name": "build", "priority": 5},
+		Arguments: map[string]any{"name": "build", "priority": 5, "payload": map[string]any{"instructions": "build the project"}},
 	})
 	if err != nil {
 		t.Fatalf("CallTool: %v", err)
@@ -69,7 +70,7 @@ func TestCreateTaskTool_WithPayload(t *testing.T) {
 		Name: "create_task",
 		Arguments: map[string]any{
 			"name":    "indexer",
-			"payload": map[string]any{"repo": "pulpo", "since": "2026-04-01"},
+			"payload": map[string]any{"instructions": "index the repo", "repo": "pulpo", "since": "2026-04-01"},
 		},
 	})
 	if err != nil {
@@ -116,7 +117,7 @@ func TestGetTaskTool_Happy(t *testing.T) {
 
 	created, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "create_task",
-		Arguments: map[string]any{"name": "x"},
+		Arguments: map[string]any{"name": "x", "payload": map[string]any{"instructions": "test"}},
 	})
 	if err != nil || created.IsError {
 		t.Fatalf("seed CreateTask: %v %+v", err, created)
@@ -171,7 +172,7 @@ func TestListTasksTool_Happy(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		_, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 			Name:      "create_task",
-			Arguments: map[string]any{"name": "x"},
+			Arguments: map[string]any{"name": "x", "payload": map[string]any{"instructions": "test"}},
 		})
 		if err != nil {
 			t.Fatalf("seed: %v", err)
@@ -209,5 +210,126 @@ func TestListTasksTool_BadStatus_ToolError(t *testing.T) {
 	}
 	if !res.IsError {
 		t.Fatal("want tool error for bad status")
+	}
+}
+
+// driveToPROpenedSQL creates a task with valid instructions and uses raw SQL
+// to push it into pr_opened with a github_pr_url. Returns the task id string.
+func driveToPROpenedSQL(t *testing.T, admin pb.AdminServiceClient, s *store.Store) string {
+	t.Helper()
+	resp, err := admin.CreateTask(context.Background(), &pb.CreateTaskRequest{
+		Name:    "t",
+		Payload: []byte(`{"instructions":"do the thing"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	id := resp.GetTask().GetId()
+	if _, err := s.Pool().Exec(context.Background(),
+		`UPDATE tasks SET status = 'pr_opened', github_pr_url = $2, updated_at = now() WHERE id = $1`,
+		id, "https://github.com/o/r/pull/1",
+	); err != nil {
+		t.Fatalf("UPDATE: %v", err)
+	}
+	return id
+}
+
+func TestRequestReviewTool_Happy(t *testing.T) {
+	admin, s := startAdminBuf(t)
+	id := driveToPROpenedSQL(t, admin, s)
+
+	session := startMCPClient(t, admin)
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "request_review",
+		Arguments: map[string]any{"id": id},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("request_review: err=%v isErr=%v body=%+v", err, res.IsError, res.Content)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var out struct {
+		Status string `json:"status"`
+	}
+	_ = json.Unmarshal(raw, &out)
+	if out.Status != "review_requested" {
+		t.Errorf("status=%q, want review_requested", out.Status)
+	}
+}
+
+func TestRequestReviewTool_NotFound_ToolError(t *testing.T) {
+	admin, _ := startAdminBuf(t)
+	session := startMCPClient(t, admin)
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "request_review",
+		Arguments: map[string]any{"id": "00000000-0000-0000-0000-000000000000"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if !res.IsError {
+		t.Error("expected tool error for unknown id")
+	}
+}
+
+func TestFinalizeTaskTool_Success(t *testing.T) {
+	admin, s := startAdminBuf(t)
+	id := driveToPROpenedSQL(t, admin, s)
+
+	session := startMCPClient(t, admin)
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "finalize_task",
+		Arguments: map[string]any{"id": id, "outcome": "success"},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("finalize_task: err=%v isErr=%v body=%+v", err, res.IsError, res.Content)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var out struct {
+		Status string `json:"status"`
+	}
+	_ = json.Unmarshal(raw, &out)
+	if out.Status != "completed" {
+		t.Errorf("status=%q, want completed", out.Status)
+	}
+}
+
+func TestFinalizeTaskTool_Failure(t *testing.T) {
+	admin, s := startAdminBuf(t)
+	id := driveToPROpenedSQL(t, admin, s)
+
+	session := startMCPClient(t, admin)
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "finalize_task",
+		Arguments: map[string]any{"id": id, "outcome": "failure", "message": "rejected"},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("finalize_task: err=%v isErr=%v body=%+v", err, res.IsError, res.Content)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var out struct {
+		Status    string `json:"status"`
+		LastError string `json:"last_error"`
+	}
+	_ = json.Unmarshal(raw, &out)
+	if out.Status != "failed" {
+		t.Errorf("status=%q, want failed", out.Status)
+	}
+	if out.LastError != "rejected" {
+		t.Errorf("last_error=%q, want rejected", out.LastError)
+	}
+}
+
+func TestFinalizeTaskTool_BadOutcome_ToolError(t *testing.T) {
+	admin, _ := startAdminBuf(t)
+	session := startMCPClient(t, admin)
+	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "finalize_task",
+		Arguments: map[string]any{"id": "00000000-0000-0000-0000-000000000000", "outcome": "garbage"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if !res.IsError {
+		t.Error("expected tool error for bad outcome")
 	}
 }

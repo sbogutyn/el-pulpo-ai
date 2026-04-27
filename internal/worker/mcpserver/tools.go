@@ -15,10 +15,13 @@ import (
 // exposes only what the agent needs to do its work — not bookkeeping fields
 // like priority, attempts, or lease timestamps.
 type TaskView struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	WorkerID string `json:"worker_id"`
-	Payload  any    `json:"payload"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	WorkerID     string `json:"worker_id"`
+	Instructions string `json:"instructions,omitempty"`
+	Payload      any    `json:"payload"`
+	JiraURL      string `json:"jira_url,omitempty"`
+	GithubPRURL  string `json:"github_pr_url,omitempty"`
 }
 
 func viewFromTask(t *taskclient.Task, workerID string) TaskView {
@@ -31,9 +34,12 @@ func viewFromTask(t *taskclient.Task, workerID string) TaskView {
 	if len(raw) == 0 {
 		v.Payload = map[string]any{}
 	} else if err := json.Unmarshal(raw, &v.Payload); err != nil {
-		// Keep the raw bytes as a string so the agent can still see what the
-		// task carries even if it isn't valid JSON.
+		// Keep raw bytes as a string so the agent can still see the payload.
 		v.Payload = string(raw)
+	} else if m, ok := v.Payload.(map[string]any); ok {
+		if s, ok := m["instructions"].(string); ok {
+			v.Instructions = s
+		}
 	}
 	return v
 }
@@ -48,6 +54,8 @@ func NewServer(st *State) *mcp.Server {
 	registerGetCurrent(s, st)
 	registerUpdateProgress(s, st)
 	registerAppendLog(s, st)
+	registerSetJiraURL(s, st)
+	registerOpenPR(s, st)
 	registerCompleteTask(s, st)
 	registerFailTask(s, st)
 	return s
@@ -159,6 +167,61 @@ func registerAppendLog(s *mcp.Server, st *State) {
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("logged (id=%d)", id)}},
 		}, appendLogOutput{LogID: id}, nil
+	})
+}
+
+type setJiraURLInput struct {
+	TaskID string `json:"task_id,omitempty" jsonschema:"task id; defaults to the currently claimed task"`
+	URL    string `json:"url" jsonschema:"JIRA issue URL (required, non-empty)"`
+}
+
+func registerSetJiraURL(s *mcp.Server, st *State) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "set_jira_url",
+		Description: "Attach a JIRA issue URL to the worker's claimed task. " +
+			"Allowed any time the worker holds the claim (claimed or in_progress). " +
+			"Refreshes the lease as a side effect.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in setJiraURLInput) (*mcp.CallToolResult, struct{}, error) {
+		if in.URL == "" {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "set_jira_url: url is required"}},
+			}, struct{}{}, nil
+		}
+		if err := st.SetJiraURL(ctx, in.TaskID, in.URL); err != nil {
+			return toolErr(err, "set_jira_url"), struct{}{}, nil
+		}
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: "jira_url set"}},
+		}, struct{}{}, nil
+	})
+}
+
+type openPRInput struct {
+	TaskID      string `json:"task_id,omitempty" jsonschema:"task id; defaults to the currently claimed task"`
+	GithubPRURL string `json:"github_pr_url" jsonschema:"GitHub pull request URL (required)"`
+}
+
+func registerOpenPR(s *mcp.Server, st *State) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "open_pr",
+		Description: "Atomically transition the worker's task to `pr_opened`, set " +
+			"github_pr_url, and release the claim. After this call the worker is idle " +
+			"and finalization (complete or fail) is performed by an admin via the " +
+			"mastermind-mcp server, the elpulpo CLI, or the admin UI.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in openPRInput) (*mcp.CallToolResult, struct{}, error) {
+		if in.GithubPRURL == "" {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "open_pr: github_pr_url is required"}},
+			}, struct{}{}, nil
+		}
+		if err := st.OpenPR(ctx, in.TaskID, in.GithubPRURL); err != nil {
+			return toolErr(err, "open_pr"), struct{}{}, nil
+		}
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: "PR opened; task parked. Worker is now idle."}},
+		}, struct{}{}, nil
 	})
 }
 

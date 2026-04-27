@@ -13,7 +13,7 @@ func TestAppendTaskLog_OwnerAppendsAndReadsBack(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	e1, err := s.AppendTaskLog(ctx, "w1", claimed.ID, "first")
@@ -28,10 +28,10 @@ func TestAppendTaskLog_OwnerAppendsAndReadsBack(t *testing.T) {
 	}
 
 	// Appending should also refresh the lease (tasks.last_heartbeat_at) and
-	// transition claimed -> running.
+	// transition claimed -> in_progress.
 	got, _ := s.GetTask(ctx, claimed.ID)
-	if got.Status != StatusRunning {
-		t.Errorf("status=%q, want running", got.Status)
+	if got.Status != StatusInProgress {
+		t.Errorf("status=%q, want in_progress", got.Status)
 	}
 
 	logs, err := s.ListTaskLogs(ctx, claimed.ID, 0)
@@ -52,7 +52,7 @@ func TestAppendTaskLog_WrongOwnerRejected(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	if _, err := s.AppendTaskLog(ctx, "w2", claimed.ID, "nope"); err != ErrNotOwner {
@@ -78,7 +78,7 @@ func TestAppendTaskLog_AfterCompleteRejected(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = s.CreateTask(ctx, NewTaskInput{Name: "t", MaxAttempts: 3, Payload: []byte(`{"instructions":"test"}`)})
 	claimed, _ := s.ClaimTask(ctx, "w1")
 
 	if _, err := s.ReportResult(ctx, "w1", claimed.ID, true, ""); err != nil {

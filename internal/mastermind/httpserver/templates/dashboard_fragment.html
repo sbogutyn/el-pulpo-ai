@@ -65,7 +65,7 @@
             <div class="current-label">current</div>
             <div class="current-name">
               <span>{{ .CurrentTask.Name }}</span>
-              <span class="pill {{ if eq (printf "%s" .CurrentTask.Status) "running" }}filled{{ end }}">{{ .CurrentTask.Status }}</span>
+              <span class="pill {{ if eq (printf "%s" .CurrentTask.Status) "in_progress" }}filled{{ end }}">{{ .CurrentTask.Status }}</span>
             </div>
             <div class="current-progress">
               {{ if .CurrentTask.ProgressNote }}

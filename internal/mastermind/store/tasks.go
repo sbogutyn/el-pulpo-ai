@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,14 +15,20 @@ import (
 type TaskStatus string
 
 const (
-	StatusPending   TaskStatus = "pending"
-	StatusClaimed   TaskStatus = "claimed"
-	StatusRunning   TaskStatus = "running"
-	StatusCompleted TaskStatus = "completed"
-	StatusFailed    TaskStatus = "failed"
+	StatusPending         TaskStatus = "pending"
+	StatusClaimed         TaskStatus = "claimed"
+	StatusInProgress      TaskStatus = "in_progress"
+	StatusPROpened        TaskStatus = "pr_opened"
+	StatusReviewRequested TaskStatus = "review_requested"
+	StatusCompleted       TaskStatus = "completed"
+	StatusFailed          TaskStatus = "failed"
 )
 
 var ErrNotFound = errors.New("task: not found")
+
+// ErrInvalidInput is returned by CreateTask when the supplied input fails
+// validation (e.g. missing payload.instructions).
+var ErrInvalidInput = errors.New("task: invalid create input")
 
 type Task struct {
 	ID              uuid.UUID       `json:"id"`
@@ -75,7 +83,30 @@ func scanTask(row pgx.Row) (Task, error) {
 	return t, err
 }
 
+// validateCreateInput enforces invariants required at task creation time:
+// payload must contain a non-empty `instructions` string. Other invariants
+// (name length, max_attempts range) are still enforced by the gRPC handler.
+func validateCreateInput(in NewTaskInput) error {
+	payload := in.Payload
+	if len(payload) == 0 {
+		return errors.New(`payload.instructions must be a non-empty string`)
+	}
+	var v struct {
+		Instructions *string `json:"instructions"`
+	}
+	if err := json.Unmarshal(payload, &v); err != nil {
+		return fmt.Errorf("payload is not valid JSON: %w", err)
+	}
+	if v.Instructions == nil || strings.TrimSpace(*v.Instructions) == "" {
+		return errors.New(`payload.instructions must be a non-empty string`)
+	}
+	return nil
+}
+
 func (s *Store) CreateTask(ctx context.Context, in NewTaskInput) (Task, error) {
+	if err := validateCreateInput(in); err != nil {
+		return Task{}, fmt.Errorf("%w: %s", ErrInvalidInput, err.Error())
+	}
 	if in.MaxAttempts <= 0 {
 		in.MaxAttempts = 3
 	}
@@ -176,7 +207,7 @@ var (
 // succeeds while a task is still pending. JiraURL and GithubPRURL are
 // included here so the pending-only edit form can set them alongside the
 // other fields; for attaching or changing refs after a task has run
-// (running/completed/failed), use UpdateTaskLinks instead.
+// (in_progress/completed/failed), use UpdateTaskLinks instead.
 type UpdateTaskInput struct {
 	Name         string
 	Priority     int
@@ -263,6 +294,7 @@ func (s *Store) RequeueTask(ctx context.Context, id uuid.UUID) (Task, error) {
           completed_at      = NULL,
           last_error        = NULL,
           progress_note     = NULL,
+          github_pr_url     = NULL,
           attempt_count     = 0,
           scheduled_for     = NULL,
           updated_at        = now()

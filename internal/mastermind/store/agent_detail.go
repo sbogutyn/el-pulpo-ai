@@ -92,7 +92,7 @@ func (s *Store) workerInfo(ctx context.Context, workerID string) (WorkerInfo, er
 	row := s.pool.QueryRow(ctx, `
         SELECT
           claimed_by AS id,
-          COUNT(*) FILTER (WHERE status IN ('claimed','running'))     AS active_tasks,
+          COUNT(*) FILTER (WHERE status IN ('claimed','in_progress'))     AS active_tasks,
           COUNT(*) FILTER (WHERE status = 'completed')                AS completed_tasks,
           COUNT(*) FILTER (WHERE status = 'failed')                   AS failed_tasks,
           MAX(COALESCE(last_heartbeat_at, claimed_at, completed_at))  AS last_seen_at
@@ -115,7 +115,7 @@ func (s *Store) workerCurrentTask(ctx context.Context, workerID string) (*Task, 
         SELECT `+taskColumns+`
           FROM tasks
          WHERE claimed_by = $1
-           AND status IN ('claimed','running')
+           AND status IN ('claimed','in_progress')
          ORDER BY claimed_at DESC NULLS LAST
          LIMIT 1
     `, workerID)

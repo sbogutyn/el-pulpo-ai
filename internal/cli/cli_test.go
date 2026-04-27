@@ -24,12 +24,14 @@ import (
 type fakeAdmin struct {
 	pb.UnimplementedAdminServiceServer
 
-	createFn      func(context.Context, *pb.CreateTaskRequest) (*pb.CreateTaskResponse, error)
-	getFn         func(context.Context, *pb.GetTaskRequest) (*pb.GetTaskResponse, error)
-	listFn        func(context.Context, *pb.ListTasksRequest) (*pb.ListTasksResponse, error)
-	cancelFn      func(context.Context, *pb.CancelTaskRequest) (*pb.CancelTaskResponse, error)
-	retryFn       func(context.Context, *pb.RetryTaskRequest) (*pb.RetryTaskResponse, error)
-	listWorkersFn func(context.Context, *pb.ListWorkersRequest) (*pb.ListWorkersResponse, error)
+	createFn        func(context.Context, *pb.CreateTaskRequest) (*pb.CreateTaskResponse, error)
+	getFn           func(context.Context, *pb.GetTaskRequest) (*pb.GetTaskResponse, error)
+	listFn          func(context.Context, *pb.ListTasksRequest) (*pb.ListTasksResponse, error)
+	cancelFn        func(context.Context, *pb.CancelTaskRequest) (*pb.CancelTaskResponse, error)
+	retryFn         func(context.Context, *pb.RetryTaskRequest) (*pb.RetryTaskResponse, error)
+	listWorkersFn   func(context.Context, *pb.ListWorkersRequest) (*pb.ListWorkersResponse, error)
+	requestReviewFn func(context.Context, *pb.RequestReviewRequest) (*pb.RequestReviewResponse, error)
+	finalizeTaskFn  func(context.Context, *pb.FinalizeTaskRequest) (*pb.FinalizeTaskResponse, error)
 }
 
 func (f *fakeAdmin) CreateTask(ctx context.Context, in *pb.CreateTaskRequest) (*pb.CreateTaskResponse, error) {
@@ -74,6 +76,20 @@ func (f *fakeAdmin) ListWorkers(ctx context.Context, in *pb.ListWorkersRequest) 
 	return f.listWorkersFn(ctx, in)
 }
 
+func (f *fakeAdmin) RequestReview(ctx context.Context, in *pb.RequestReviewRequest) (*pb.RequestReviewResponse, error) {
+	if f.requestReviewFn == nil {
+		return nil, status.Error(codes.Unimplemented, "requestReviewFn not set")
+	}
+	return f.requestReviewFn(ctx, in)
+}
+
+func (f *fakeAdmin) FinalizeTask(ctx context.Context, in *pb.FinalizeTaskRequest) (*pb.FinalizeTaskResponse, error) {
+	if f.finalizeTaskFn == nil {
+		return nil, status.Error(codes.Unimplemented, "finalizeTaskFn not set")
+	}
+	return f.finalizeTaskFn(ctx, in)
+}
+
 const testAdminToken = "admin-tok"
 
 // startFakeAdmin stands up a bufconn gRPC server with the same per-method
@@ -86,9 +102,11 @@ func startFakeAdmin(t *testing.T, f *fakeAdmin) {
 		"/elpulpo.tasks.v1.AdminService/CreateTask":  testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/GetTask":     testAdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListTasks":   testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/CancelTask":  testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/RetryTask":   testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/ListWorkers": testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/CancelTask":     testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/RetryTask":      testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListWorkers":    testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/RequestReview":  testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/FinalizeTask":   testAdminToken,
 	}
 	lis := bufconn.Listen(1 << 20)
 	srv := grpc.NewServer(grpc.UnaryInterceptor(auth.PerMethodInterceptor(policy)))
@@ -334,3 +352,150 @@ func TestCLI_MissingAddr(t *testing.T) {
 	}
 }
 
+func TestCLI_TasksRequestReview_Happy(t *testing.T) {
+	called := false
+	f := &fakeAdmin{
+		requestReviewFn: func(_ context.Context, in *pb.RequestReviewRequest) (*pb.RequestReviewResponse, error) {
+			called = true
+			if in.GetId() != "00000000-0000-0000-0000-000000000001" {
+				t.Errorf("Id=%q, want fixed UUID", in.GetId())
+			}
+			return &pb.RequestReviewResponse{Task: &pb.TaskDetail{
+				Id: in.GetId(), Name: "n", Status: "review_requested",
+			}}, nil
+		},
+	}
+	startFakeAdmin(t, f)
+	stdout, _, err := runCLI(t, "tasks", "request-review", "00000000-0000-0000-0000-000000000001")
+	if err != nil {
+		t.Fatalf("request-review: %v", err)
+	}
+	if !called {
+		t.Fatal("RequestReview not called")
+	}
+	if !strings.Contains(stdout, "review_requested") {
+		t.Errorf("stdout does not show review_requested status: %s", stdout)
+	}
+}
+
+func TestCLI_TasksRequestReview_RequiresID(t *testing.T) {
+	f := &fakeAdmin{}
+	startFakeAdmin(t, f)
+	_, _, err := runCLI(t, "tasks", "request-review")
+	if err == nil {
+		t.Fatal("expected error when id is missing")
+	}
+}
+
+func TestCLI_TasksFinalize_Success(t *testing.T) {
+	called := false
+	f := &fakeAdmin{
+		finalizeTaskFn: func(_ context.Context, in *pb.FinalizeTaskRequest) (*pb.FinalizeTaskResponse, error) {
+			called = true
+			switch in.GetOutcome().(type) {
+			case *pb.FinalizeTaskRequest_Success_:
+				// ok
+			default:
+				t.Errorf("expected Success outcome, got %T", in.GetOutcome())
+			}
+			return &pb.FinalizeTaskResponse{Task: &pb.TaskDetail{
+				Id: in.GetId(), Name: "n", Status: "completed",
+			}}, nil
+		},
+	}
+	startFakeAdmin(t, f)
+	stdout, _, err := runCLI(t, "tasks", "finalize", "00000000-0000-0000-0000-000000000001", "--success")
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+	if !called {
+		t.Fatal("FinalizeTask not called")
+	}
+	if !strings.Contains(stdout, "completed") {
+		t.Errorf("stdout: %q", stdout)
+	}
+}
+
+func TestCLI_TasksFinalize_Failure(t *testing.T) {
+	f := &fakeAdmin{
+		finalizeTaskFn: func(_ context.Context, in *pb.FinalizeTaskRequest) (*pb.FinalizeTaskResponse, error) {
+			fail, ok := in.GetOutcome().(*pb.FinalizeTaskRequest_Failure_)
+			if !ok {
+				t.Fatalf("expected Failure outcome, got %T", in.GetOutcome())
+			}
+			if fail.Failure.GetMessage() != "rejected" {
+				t.Errorf("message=%q, want rejected", fail.Failure.GetMessage())
+			}
+			return &pb.FinalizeTaskResponse{Task: &pb.TaskDetail{
+				Id: in.GetId(), Status: "failed", LastError: "rejected",
+			}}, nil
+		},
+	}
+	startFakeAdmin(t, f)
+	stdout, _, err := runCLI(t, "tasks", "finalize", "00000000-0000-0000-0000-000000000001", "--fail", "rejected")
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+	if !strings.Contains(stdout, "failed") {
+		t.Errorf("stdout: %q", stdout)
+	}
+}
+
+func TestCLI_TasksFinalize_RequiresExactlyOneOutcome(t *testing.T) {
+	f := &fakeAdmin{}
+	startFakeAdmin(t, f)
+	_, _, err := runCLI(t, "tasks", "finalize", "00000000-0000-0000-0000-000000000001")
+	if err == nil {
+		t.Fatal("expected error: no outcome flag")
+	}
+	_, _, err = runCLI(t, "tasks", "finalize", "00000000-0000-0000-0000-000000000001", "--success", "--fail", "x")
+	if err == nil {
+		t.Fatal("expected error: both outcomes set")
+	}
+}
+
+func TestCLI_TasksCreate_Instructions_BuildsPayload(t *testing.T) {
+	var seen []byte
+	f := &fakeAdmin{
+		createFn: func(_ context.Context, in *pb.CreateTaskRequest) (*pb.CreateTaskResponse, error) {
+			seen = in.GetPayload()
+			return &pb.CreateTaskResponse{Task: &pb.TaskDetail{
+				Id: "00000000-0000-0000-0000-000000000001", Name: in.GetName(),
+			}}, nil
+		},
+	}
+	startFakeAdmin(t, f)
+	_, _, err := runCLI(t, "tasks", "create", "--name", "x", "--instructions", "do the thing")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if !strings.Contains(string(seen), `"instructions":"do the thing"`) {
+		t.Errorf("payload=%q does not contain instructions", string(seen))
+	}
+}
+
+func TestCLI_TasksCreate_Instructions_MergesIntoPayload(t *testing.T) {
+	var seen []byte
+	f := &fakeAdmin{
+		createFn: func(_ context.Context, in *pb.CreateTaskRequest) (*pb.CreateTaskResponse, error) {
+			seen = in.GetPayload()
+			return &pb.CreateTaskResponse{Task: &pb.TaskDetail{
+				Id: "00000000-0000-0000-0000-000000000001", Name: in.GetName(),
+			}}, nil
+		},
+	}
+	startFakeAdmin(t, f)
+	_, _, err := runCLI(t, "tasks", "create", "--name", "x",
+		"--instructions", "go",
+		"--payload", `{"repo":"pulpo"}`,
+	)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if !strings.Contains(string(seen), `"instructions":"go"`) {
+		t.Errorf("payload=%q does not contain instructions", string(seen))
+	}
+	if !strings.Contains(string(seen), `"repo":"pulpo"`) {
+		t.Errorf("payload=%q does not contain repo", string(seen))
+	}
+}

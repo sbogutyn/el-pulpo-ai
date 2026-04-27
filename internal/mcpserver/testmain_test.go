@@ -76,9 +76,11 @@ func startAdminBuf(t *testing.T) (pb.AdminServiceClient, *store.Store) {
 	}
 
 	policy := map[string]string{
-		"/elpulpo.tasks.v1.AdminService/CreateTask": testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/GetTask":    testAdminToken,
-		"/elpulpo.tasks.v1.AdminService/ListTasks":  testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/CreateTask":      testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/GetTask":         testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/ListTasks":       testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/RequestReview":   testAdminToken,
+		"/elpulpo.tasks.v1.AdminService/FinalizeTask":    testAdminToken,
 	}
 
 	lis := bufconn.Listen(1 << 20)

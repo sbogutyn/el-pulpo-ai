@@ -20,6 +20,7 @@ type taskForm struct {
 	Priority     int
 	MaxAttempts  int
 	ScheduledFor string
+	Instructions string
 	Payload      string
 	JiraURL      string
 	GithubPRURL  string
@@ -41,10 +42,11 @@ type formPageData struct {
 }
 
 type detailPageData struct {
-	Title string
-	Task  store.Task
-	Logs  []store.TaskLogEntry
-	Error string
+	Title        string
+	Task         store.Task
+	Instructions string
+	Logs         []store.TaskLogEntry
+	Error        string
 }
 
 func (s *Server) registerTasksRoutes() {
@@ -97,7 +99,15 @@ func (s *Server) buildListData(r *http.Request) listPageData {
 		Title:         "Tasks",
 		Items:         page.Items,
 		Total:         page.Total,
-		Statuses:      []store.TaskStatus{store.StatusPending, store.StatusClaimed, store.StatusRunning, store.StatusCompleted, store.StatusFailed},
+		Statuses: []store.TaskStatus{
+			store.StatusPending,
+			store.StatusClaimed,
+			store.StatusInProgress,
+			store.StatusPROpened,
+			store.StatusReviewRequested,
+			store.StatusCompleted,
+			store.StatusFailed,
+		},
 		CurrentStatus: status,
 	}
 }
@@ -123,7 +133,13 @@ func (s *Server) tasksCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := s.store.CreateTask(r.Context(), input); err != nil {
-		renderFormError(w, s, "tasks_new", formPageData{Title: "New task", Form: form, Error: err.Error()}, http.StatusInternalServerError)
+		msg := err.Error()
+		if errors.Is(err, store.ErrInvalidInput) {
+			// Surface to the form as a user-fixable error.
+			renderFormError(w, s, "tasks_new", formPageData{Title: "New task", Form: form, Error: msg}, http.StatusBadRequest)
+			return
+		}
+		renderFormError(w, s, "tasks_new", formPageData{Title: "New task", Form: form, Error: msg}, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/tasks", http.StatusSeeOther)
@@ -161,6 +177,10 @@ func (s *Server) tasksMember(w http.ResponseWriter, r *http.Request) {
 		s.tasksRequeue(w, r, id)
 	case verb == "links" && r.Method == http.MethodPost:
 		s.tasksUpdateLinks(w, r, id)
+	case verb == "request-review" && r.Method == http.MethodPost:
+		s.tasksRequestReview(w, r, id)
+	case verb == "finalize" && r.Method == http.MethodPost:
+		s.tasksFinalize(w, r, id)
 	default:
 		http.NotFound(w, r)
 	}
@@ -180,7 +200,7 @@ func (s *Server) tasksDetail(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if err != nil {
 		s.log.Warn("list task logs", "error", err, "task_id", id)
 	}
-	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Logs: logs}); err != nil {
+	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Instructions: instructionsFrom(task.Payload), Logs: logs}); err != nil {
 		s.log.Error("render tasks_detail", "error", err)
 		http.Error(w, "render error", http.StatusInternalServerError)
 	}
@@ -302,6 +322,46 @@ func (s *Server) tasksDelete(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 }
 
+func (s *Server) tasksRequestReview(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	switch err := s.store.RequestReview(r.Context(), id); {
+	case err == nil:
+		http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+	case errors.Is(err, store.ErrNotFound):
+		http.NotFound(w, r)
+	case errors.Is(err, store.ErrInvalidTransition):
+		http.Error(w, "task is not in pr_opened", http.StatusConflict)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) tasksFinalize(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var success bool
+	switch r.PostFormValue("outcome") {
+	case "success":
+		success = true
+	case "failure":
+		success = false
+	default:
+		http.Error(w, `outcome must be "success" or "failure"`, http.StatusBadRequest)
+		return
+	}
+	switch err := s.store.FinalizeTask(r.Context(), id, success, r.PostFormValue("message")); {
+	case err == nil:
+		http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+	case errors.Is(err, store.ErrNotFound):
+		http.NotFound(w, r)
+	case errors.Is(err, store.ErrInvalidTransition):
+		http.Error(w, "task is not in pr_opened or review_requested", http.StatusConflict)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) tasksRequeue(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	switch _, err := s.store.RequeueTask(r.Context(), id); {
 	case errors.Is(err, store.ErrNotFound):
@@ -321,6 +381,22 @@ func (s *Server) tasksRequeue(w http.ResponseWriter, r *http.Request, id uuid.UU
 
 // ---- helpers ----
 
+// instructionsFrom extracts the canonical "instructions" text from a task
+// payload. Returns "" when the payload isn't a JSON object or doesn't carry
+// the key.
+func instructionsFrom(payload []byte) string {
+	if len(payload) == 0 {
+		return ""
+	}
+	var v struct {
+		Instructions string `json:"instructions"`
+	}
+	if err := json.Unmarshal(payload, &v); err != nil {
+		return ""
+	}
+	return v.Instructions
+}
+
 func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 	if err := r.ParseForm(); err != nil {
 		return taskForm{}, store.NewTaskInput{}, err
@@ -328,6 +404,7 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 	f := taskForm{
 		Name:         r.FormValue("name"),
 		ScheduledFor: r.FormValue("scheduled_for"),
+		Instructions: r.PostFormValue("instructions"),
 		Payload:      r.FormValue("payload"),
 		JiraURL:      strings.TrimSpace(r.FormValue("jira_url")),
 		GithubPRURL:  strings.TrimSpace(r.FormValue("github_pr_url")),
@@ -355,7 +432,25 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 	if !json.Valid([]byte(f.Payload)) {
 		return f, store.NewTaskInput{}, errors.New("payload must be valid JSON")
 	}
-	payloadJSON := json.RawMessage(f.Payload)
+
+	// Splice the instructions field into the payload object when provided.
+	// This mirrors the CLI behaviour: the textarea is a convenience wrapper
+	// around the canonical payload.instructions key.
+	var payloadJSON json.RawMessage
+	if f.Instructions != "" {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(f.Payload), &obj); err != nil {
+			return f, store.NewTaskInput{}, errors.New("payload must be valid JSON")
+		}
+		obj["instructions"] = f.Instructions
+		merged, err := json.Marshal(obj)
+		if err != nil {
+			return f, store.NewTaskInput{}, errors.New("failed to merge instructions into payload")
+		}
+		payloadJSON = json.RawMessage(merged)
+	} else {
+		payloadJSON = json.RawMessage(f.Payload)
+	}
 
 	var jiraPtr, prPtr *string
 	if f.JiraURL != "" {
@@ -393,10 +488,11 @@ func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 
 func formFromTask(t store.Task) taskForm {
 	tf := taskForm{
-		Name:        t.Name,
-		Priority:    t.Priority,
-		MaxAttempts: t.MaxAttempts,
-		Payload:     string(t.Payload),
+		Name:         t.Name,
+		Priority:     t.Priority,
+		MaxAttempts:  t.MaxAttempts,
+		Payload:      string(t.Payload),
+		Instructions: instructionsFrom(t.Payload),
 	}
 	if t.ScheduledFor != nil {
 		tf.ScheduledFor = t.ScheduledFor.In(time.Local).Format("2006-01-02T15:04")

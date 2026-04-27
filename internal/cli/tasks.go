@@ -17,7 +17,7 @@ import (
 
 func runTasks(ctx context.Context, cfg Config, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: elpulpo tasks {create|get|list|cancel|retry} ...")
+		return errors.New("usage: elpulpo tasks {create|get|list|cancel|retry|request-review|finalize} ...")
 	}
 	sub, rest := args[0], args[1:]
 	switch sub {
@@ -31,6 +31,10 @@ func runTasks(ctx context.Context, cfg Config, args []string, stdout, stderr io.
 		return runTasksCancel(ctx, cfg, rest, stdout, stderr)
 	case "retry":
 		return runTasksRetry(ctx, cfg, rest, stdout, stderr)
+	case "request-review":
+		return runTasksRequestReview(ctx, cfg, rest, stdout, stderr)
+	case "finalize":
+		return runTasksFinalize(ctx, cfg, rest, stdout, stderr)
 	default:
 		return fmt.Errorf("unknown tasks subcommand %q", sub)
 	}
@@ -41,6 +45,7 @@ func runTasksCreate(ctx context.Context, cfg Config, args []string, stdout, stde
 	var (
 		name         = fs.String("name", "", "task type (required)")
 		payload      = fs.String("payload", "", "opaque JSON payload; @path reads from file, - reads stdin")
+		instructions = fs.String("instructions", "", "instructions text; @path reads from file, - reads stdin")
 		priority     = fs.Int("priority", 0, "priority (higher runs first)")
 		maxAttempts  = fs.Int("max-attempts", 0, "max attempts (default 3, 1..50)")
 		scheduledFor = fs.String("scheduled-for", "", "earliest eligible time (RFC3339)")
@@ -71,6 +76,30 @@ func runTasksCreate(ctx context.Context, cfg Config, args []string, stdout, stde
 			return fmt.Errorf("--payload is not valid JSON: %w", err)
 		}
 		req.Payload = raw
+	}
+	if *instructions != "" {
+		raw, err := readPayload(*instructions, stderr)
+		if err != nil {
+			return err
+		}
+		if len(req.Payload) == 0 {
+			b, err := json.Marshal(map[string]string{"instructions": string(raw)})
+			if err != nil {
+				return fmt.Errorf("marshal instructions: %w", err)
+			}
+			req.Payload = b
+		} else {
+			var m map[string]any
+			if err := json.Unmarshal(req.Payload, &m); err != nil || m == nil {
+				return errors.New("--payload must be a JSON object when --instructions is also set")
+			}
+			m["instructions"] = string(raw)
+			b, err := json.Marshal(m)
+			if err != nil {
+				return fmt.Errorf("merge instructions into payload: %w", err)
+			}
+			req.Payload = b
+		}
 	}
 	if *scheduledFor != "" {
 		t, err := time.Parse(time.RFC3339, *scheduledFor)
@@ -125,7 +154,7 @@ func runTasksGet(ctx context.Context, cfg Config, args []string, stdout, stderr 
 func runTasksList(ctx context.Context, cfg Config, args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("tasks list", flag.ContinueOnError)
 	var (
-		statusF = fs.String("status", "", "filter: pending|claimed|running|completed|failed")
+		statusF = fs.String("status", "", "filter: pending|claimed|in_progress|pr_opened|review_requested|completed|failed")
 		limit   = fs.Int("limit", 50, "page size (1..500)")
 		offset  = fs.Int("offset", 0, "pagination offset")
 		jsonOut = fs.Bool("json", false, "emit raw JSON rather than a table")
@@ -231,4 +260,80 @@ func readPayload(v string, _ io.Writer) ([]byte, error) {
 	default:
 		return []byte(v), nil
 	}
+}
+
+func runTasksRequestReview(ctx context.Context, cfg Config, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("tasks request-review", flag.ContinueOnError)
+	jsonOut := fs.Bool("json", false, "emit raw TaskDetail JSON instead of human summary")
+	positional, err := parseFlags(fs, stderr, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 1 {
+		return errors.New("usage: elpulpo tasks request-review <id>")
+	}
+	client, closer, err := newAdminClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, cfg.RequestTimeout)
+	defer cancel()
+
+	resp, err := client.RequestReview(ctx, &pb.RequestReviewRequest{Id: positional[0]})
+	if err != nil {
+		return formatErr(err)
+	}
+	return emitTask(stdout, resp.GetTask(), *jsonOut, fmt.Sprintf("requested review for %s (%s)", resp.GetTask().GetId(), resp.GetTask().GetStatus()))
+}
+
+func runTasksFinalize(ctx context.Context, cfg Config, args []string, stdout, stderr io.Writer) error {
+	// Extract the positional ID before flag parsing, supporting both
+	// "finalize <id> --flags" and "finalize --flags <id>" orderings.
+	var id string
+	var flagArgs []string
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") && id == "" {
+			id = a
+		} else {
+			flagArgs = append(flagArgs, a)
+		}
+	}
+	if id == "" {
+		return errors.New("usage: elpulpo tasks finalize <id> --success | --fail \"reason\"")
+	}
+
+	fs := flag.NewFlagSet("tasks finalize", flag.ContinueOnError)
+	var (
+		succeed = fs.Bool("success", false, "finalize as completed")
+		failMsg = fs.String("fail", "", "finalize as failed with this message")
+		jsonOut = fs.Bool("json", false, "emit raw TaskDetail JSON instead of human summary")
+	)
+	if _, err := parseFlags(fs, stderr, flagArgs); err != nil {
+		return err
+	}
+	if *succeed == (*failMsg != "") {
+		return errors.New("specify exactly one of --success or --fail \"reason\"")
+	}
+	req := &pb.FinalizeTaskRequest{Id: id}
+	if *succeed {
+		req.Outcome = &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}}
+	} else {
+		req.Outcome = &pb.FinalizeTaskRequest_Failure_{Failure: &pb.FinalizeTaskRequest_Failure{Message: *failMsg}}
+	}
+	client, closer, err := newAdminClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer closer.Close()
+
+	ctx, cancel := context.WithTimeout(ctx, cfg.RequestTimeout)
+	defer cancel()
+
+	resp, err := client.FinalizeTask(ctx, req)
+	if err != nil {
+		return formatErr(err)
+	}
+	return emitTask(stdout, resp.GetTask(), *jsonOut, fmt.Sprintf("finalized %s (%s)", resp.GetTask().GetId(), resp.GetTask().GetStatus()))
 }

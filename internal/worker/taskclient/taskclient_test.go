@@ -34,6 +34,9 @@ type fakeServer struct {
 	reportCalls int32
 	lastReport  *pb.ReportResultRequest
 
+	lastSetJira *pb.SetJiraURLRequest
+	lastOpenPR  *pb.OpenPRRequest
+
 	failNextHeartbeat bool
 }
 
@@ -71,6 +74,20 @@ func (f *fakeServer) ReportResult(_ context.Context, req *pb.ReportResultRequest
 	f.lastReport = req
 	f.mu.Unlock()
 	return &pb.ReportResultResponse{}, nil
+}
+
+func (f *fakeServer) SetJiraURL(_ context.Context, req *pb.SetJiraURLRequest) (*pb.SetJiraURLResponse, error) {
+	f.mu.Lock()
+	f.lastSetJira = req
+	f.mu.Unlock()
+	return &pb.SetJiraURLResponse{}, nil
+}
+
+func (f *fakeServer) OpenPR(_ context.Context, req *pb.OpenPRRequest) (*pb.OpenPRResponse, error) {
+	f.mu.Lock()
+	f.lastOpenPR = req
+	f.mu.Unlock()
+	return &pb.OpenPRResponse{}, nil
 }
 
 func dialFake(t *testing.T, fs *fakeServer) pb.TaskServiceClient {
@@ -232,5 +249,62 @@ func TestTask_HeartbeatErrorInvokesOnError(t *testing.T) {
 		}
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("onError not invoked")
+	}
+}
+
+func TestTask_SetJiraURL(t *testing.T) {
+	fs := &fakeServer{claimTask: &pb.Task{Id: "id-1", Name: "n"}}
+	c := NewClient(dialFake(t, fs), "w1")
+	task, err := c.Claim(context.Background())
+	if err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+
+	if err := task.SetJiraURL(context.Background(), "https://jira/T-1"); err != nil {
+		t.Fatalf("SetJiraURL: %v", err)
+	}
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	if fs.lastSetJira == nil ||
+		fs.lastSetJira.GetWorkerId() != "w1" ||
+		fs.lastSetJira.GetTaskId() != "id-1" ||
+		fs.lastSetJira.GetUrl() != "https://jira/T-1" {
+		t.Errorf("unexpected SetJiraURL request: %+v", fs.lastSetJira)
+	}
+}
+
+func TestTask_OpenPR(t *testing.T) {
+	fs := &fakeServer{claimTask: &pb.Task{Id: "id-1", Name: "n"}}
+	c := NewClient(dialFake(t, fs), "w1")
+	task, err := c.Claim(context.Background())
+	if err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+
+	if err := task.OpenPR(context.Background(), "https://github.com/o/r/pull/1"); err != nil {
+		t.Fatalf("OpenPR: %v", err)
+	}
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	if fs.lastOpenPR == nil ||
+		fs.lastOpenPR.GetWorkerId() != "w1" ||
+		fs.lastOpenPR.GetTaskId() != "id-1" ||
+		fs.lastOpenPR.GetGithubPrUrl() != "https://github.com/o/r/pull/1" {
+		t.Errorf("unexpected OpenPR request: %+v", fs.lastOpenPR)
+	}
+}
+
+func TestTask_OpenPR_FinalizesAndIsIdempotent(t *testing.T) {
+	fs := &fakeServer{claimTask: &pb.Task{Id: "id-1", Name: "n"}}
+	c := NewClient(dialFake(t, fs), "w1")
+	task, _ := c.Claim(context.Background())
+
+	if err := task.OpenPR(context.Background(), "https://github.com/o/r/pull/1"); err != nil {
+		t.Fatalf("OpenPR: %v", err)
+	}
+	// A subsequent Complete or Fail must return ErrAlreadyFinalized — OpenPR
+	// is a terminal call from the Task's perspective (claim is released).
+	if err := task.Complete(context.Background()); !errors.Is(err, ErrAlreadyFinalized) {
+		t.Errorf("Complete after OpenPR: got %v, want ErrAlreadyFinalized", err)
 	}
 }

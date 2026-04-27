@@ -65,6 +65,9 @@ func (a *AdminServer) CreateTask(ctx context.Context, req *pb.CreateTaskRequest)
 
 	t, err := a.store.CreateTask(ctx, in)
 	if err != nil {
+		if errors.Is(err, store.ErrInvalidInput) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 		return nil, status.Errorf(codes.Internal, "create: %v", err)
 	}
 	return &pb.CreateTaskResponse{Task: toTaskDetail(t)}, nil
@@ -128,11 +131,13 @@ func (a *AdminServer) GetTask(ctx context.Context, req *pb.GetTaskRequest) (*pb.
 }
 
 var knownStatuses = map[string]store.TaskStatus{
-	"pending":   store.StatusPending,
-	"claimed":   store.StatusClaimed,
-	"running":   store.StatusRunning,
-	"completed": store.StatusCompleted,
-	"failed":    store.StatusFailed,
+	"pending":          store.StatusPending,
+	"claimed":          store.StatusClaimed,
+	"in_progress":      store.StatusInProgress,
+	"pr_opened":        store.StatusPROpened,
+	"review_requested": store.StatusReviewRequested,
+	"completed":        store.StatusCompleted,
+	"failed":           store.StatusFailed,
 }
 
 func (a *AdminServer) ListTaskLogs(ctx context.Context, req *pb.ListTaskLogsRequest) (*pb.ListTaskLogsResponse, error) {
@@ -179,7 +184,7 @@ func (a *AdminServer) CancelTask(ctx context.Context, req *pb.CancelTaskRequest)
 	case errors.Is(err, store.ErrNotFound):
 		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
 	case errors.Is(err, store.ErrNotDeletable):
-		return nil, status.Error(codes.FailedPrecondition, "cannot cancel an active task (claimed or running)")
+		return nil, status.Error(codes.FailedPrecondition, "cannot cancel an active or parked task (claimed, in_progress, pr_opened, or review_requested)")
 	default:
 		return nil, status.Errorf(codes.Internal, "cancel: %v", err)
 	}
@@ -197,7 +202,7 @@ func (a *AdminServer) RetryTask(ctx context.Context, req *pb.RetryTaskRequest) (
 	case errors.Is(err, store.ErrNotFound):
 		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
 	case errors.Is(err, store.ErrNotRequeueable):
-		return nil, status.Error(codes.FailedPrecondition, "cannot retry an active task (claimed or running)")
+		return nil, status.Error(codes.FailedPrecondition, "cannot retry an active or parked task; finalize parked tasks first (claimed, in_progress, pr_opened, or review_requested)")
 	default:
 		return nil, status.Errorf(codes.Internal, "retry: %v", err)
 	}
@@ -222,6 +227,61 @@ func (a *AdminServer) ListWorkers(ctx context.Context, _ *pb.ListWorkersRequest)
 		out.Items = append(out.Items, info)
 	}
 	return out, nil
+}
+
+func (a *AdminServer) RequestReview(ctx context.Context, req *pb.RequestReviewRequest) (*pb.RequestReviewResponse, error) {
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "id must be a UUID")
+	}
+	switch err := a.store.RequestReview(ctx, id); {
+	case err == nil:
+		t, gerr := a.store.GetTask(ctx, id)
+		if gerr != nil {
+			return nil, status.Errorf(codes.Internal, "get after request_review: %v", gerr)
+		}
+		return &pb.RequestReviewResponse{Task: toTaskDetail(t)}, nil
+	case errors.Is(err, store.ErrNotFound):
+		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
+	case errors.Is(err, store.ErrInvalidTransition):
+		return nil, status.Error(codes.FailedPrecondition, "task is not in pr_opened")
+	default:
+		return nil, status.Errorf(codes.Internal, "request_review: %v", err)
+	}
+}
+
+func (a *AdminServer) FinalizeTask(ctx context.Context, req *pb.FinalizeTaskRequest) (*pb.FinalizeTaskResponse, error) {
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "id must be a UUID")
+	}
+	var (
+		success bool
+		errMsg  string
+	)
+	switch outcome := req.GetOutcome().(type) {
+	case *pb.FinalizeTaskRequest_Success_:
+		success = true
+	case *pb.FinalizeTaskRequest_Failure_:
+		success = false
+		errMsg = outcome.Failure.GetMessage()
+	default:
+		return nil, status.Error(codes.InvalidArgument, "outcome is required (success or failure)")
+	}
+	switch err := a.store.FinalizeTask(ctx, id, success, errMsg); {
+	case err == nil:
+		t, gerr := a.store.GetTask(ctx, id)
+		if gerr != nil {
+			return nil, status.Errorf(codes.Internal, "get after finalize: %v", gerr)
+		}
+		return &pb.FinalizeTaskResponse{Task: toTaskDetail(t)}, nil
+	case errors.Is(err, store.ErrNotFound):
+		return nil, status.Errorf(codes.NotFound, "task %s not found", id)
+	case errors.Is(err, store.ErrInvalidTransition):
+		return nil, status.Error(codes.FailedPrecondition, "task is not in pr_opened or review_requested")
+	default:
+		return nil, status.Errorf(codes.Internal, "finalize: %v", err)
+	}
 }
 
 func (a *AdminServer) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*pb.ListTasksResponse, error) {

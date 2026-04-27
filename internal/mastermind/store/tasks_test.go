@@ -15,7 +15,7 @@ func TestCreateAndGetTask(t *testing.T) {
 	defer s.Close()
 	truncate(t, s.pool)
 
-	payload := json.RawMessage(`{"k":"v"}`)
+	payload := json.RawMessage(`{"k":"v","instructions":"test"}`)
 	created, err := s.CreateTask(ctx, NewTaskInput{
 		Name:         "my-task",
 		Payload:      payload,
@@ -61,7 +61,7 @@ func TestListTasks_FilterAndPaginate(t *testing.T) {
 	truncate(t, s.pool)
 
 	for i := 0; i < 5; i++ {
-		if _, err := s.CreateTask(ctx, NewTaskInput{Name: "t", Payload: []byte("{}"), MaxAttempts: 3}); err != nil {
+		if _, err := s.CreateTask(ctx, NewTaskInput{Name: "t", Payload: []byte(`{"instructions":"test"}`), MaxAttempts: 3}); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(2 * time.Millisecond)
@@ -90,7 +90,7 @@ func TestCreateAndGetTask_WithIssueRefs(t *testing.T) {
 
 	created, err := s.CreateTask(ctx, NewTaskInput{
 		Name:        "with-refs",
-		Payload:     json.RawMessage(`{}`),
+		Payload:     json.RawMessage(`{"instructions":"test"}`),
 		MaxAttempts: 3,
 		JiraURL:     &jira,
 		GithubPRURL: &pr,
@@ -124,7 +124,7 @@ func TestCreateTask_NoIssueRefs_StoresNull(t *testing.T) {
 	truncate(t, s.pool)
 
 	created, err := s.CreateTask(ctx, NewTaskInput{
-		Name: "no-refs", Payload: json.RawMessage(`{}`), MaxAttempts: 3,
+		Name: "no-refs", Payload: json.RawMessage(`{"instructions":"test"}`), MaxAttempts: 3,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)

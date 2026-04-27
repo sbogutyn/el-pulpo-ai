@@ -16,6 +16,7 @@
            placeholder="https://github.com/org/repo/pull/123"
            value="{{ .Form.GithubPRURL }}">
   </label>
+  <label>Instructions <textarea name="instructions" rows="4">{{ .Form.Instructions }}</textarea></label>
   <label>Payload (JSON) <textarea name="payload" rows="6">{{ .Form.Payload }}</textarea></label>
   <button type="submit">Create</button>
 </form>

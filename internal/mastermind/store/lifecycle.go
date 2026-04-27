@@ -15,9 +15,9 @@ func (s *Store) Heartbeat(ctx context.Context, workerID string, taskID uuid.UUID
 	ct, err := s.pool.Exec(ctx, `
       UPDATE tasks
       SET last_heartbeat_at = now(),
-          status            = CASE WHEN status = 'claimed' THEN 'running' ELSE status END,
+          status            = CASE WHEN status = 'claimed' THEN 'in_progress' ELSE status END,
           updated_at        = now()
-      WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
+      WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','in_progress')
     `, taskID, workerID)
 	if err != nil {
 		return err
@@ -41,9 +41,9 @@ func (s *Store) UpdateProgress(ctx context.Context, workerID string, taskID uuid
       UPDATE tasks
       SET progress_note     = $3,
           last_heartbeat_at = now(),
-          status            = CASE WHEN status = 'claimed' THEN 'running' ELSE status END,
+          status            = CASE WHEN status = 'claimed' THEN 'in_progress' ELSE status END,
           updated_at        = now()
-      WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
+      WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','in_progress')
     `, taskID, workerID, notePtr)
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.U
               completed_at = now(),
               last_error   = NULL,
               updated_at   = now()
-          WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
+          WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','in_progress')
         `, taskID, workerID)
 		if execErr != nil {
 			return false, execErr
@@ -108,7 +108,7 @@ func (s *Store) ReportResult(ctx context.Context, workerID string, taskID uuid.U
                               END,
           last_error        = $3,
           updated_at        = now()
-      WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','running')
+      WHERE id = $1 AND claimed_by = $2 AND status IN ('claimed','in_progress')
       RETURNING status
     `, taskID, workerID, errMsg).Scan(&newStatus)
 	if errors.Is(scanErr, pgx.ErrNoRows) {
@@ -158,7 +158,7 @@ func (s *Store) ReapStale(ctx context.Context, visibility time.Duration) (ReapOu
                               END,
           last_error        = 'lease expired',
           updated_at        = now()
-      WHERE status IN ('claimed','running')
+      WHERE status IN ('claimed','in_progress')
         AND last_heartbeat_at < now() - make_interval(secs => $1::double precision / 1000000)
       RETURNING status
     `, usecs)

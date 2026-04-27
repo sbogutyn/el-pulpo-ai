@@ -66,6 +66,8 @@ func run() error {
 		"/elpulpo.tasks.v1.TaskService/ReportResult":   cfg.WorkerToken,
 		"/elpulpo.tasks.v1.TaskService/UpdateProgress": cfg.WorkerToken,
 		"/elpulpo.tasks.v1.TaskService/AppendLog":      cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/SetJiraURL":     cfg.WorkerToken,
+		"/elpulpo.tasks.v1.TaskService/OpenPR":         cfg.WorkerToken,
 		"/elpulpo.tasks.v1.AdminService/CreateTask":    cfg.AdminToken,
 		"/elpulpo.tasks.v1.AdminService/GetTask":       cfg.AdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListTasks":     cfg.AdminToken,
@@ -73,6 +75,8 @@ func run() error {
 		"/elpulpo.tasks.v1.AdminService/CancelTask":    cfg.AdminToken,
 		"/elpulpo.tasks.v1.AdminService/RetryTask":     cfg.AdminToken,
 		"/elpulpo.tasks.v1.AdminService/ListWorkers":   cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/RequestReview": cfg.AdminToken,
+		"/elpulpo.tasks.v1.AdminService/FinalizeTask":  cfg.AdminToken,
 	}
 	gs := grpc.NewServer(grpc.UnaryInterceptor(auth.PerMethodInterceptor(policy)))
 	pb.RegisterTaskServiceServer(gs, grpcserver.New(s))

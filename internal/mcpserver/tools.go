@@ -154,7 +154,7 @@ func registerGetTask(s *mcp.Server, admin pb.AdminServiceClient) {
 }
 
 type ListTasksInput struct {
-	Status string `json:"status,omitempty" jsonschema:"filter: pending|claimed|running|completed|failed"`
+	Status string `json:"status,omitempty" jsonschema:"filter: pending|claimed|in_progress|pr_opened|review_requested|completed|failed"`
 	Limit  int32  `json:"limit,omitempty" jsonschema:"page size, default 50, max 500"`
 	Offset int32  `json:"offset,omitempty" jsonschema:"pagination offset, default 0"`
 }
@@ -186,6 +186,60 @@ func registerListTasks(s *mcp.Server, admin pb.AdminServiceClient) {
 				Text: fmt.Sprintf("%d of %d tasks", len(out.Items), out.Total),
 			}},
 		}, out, nil
+	})
+}
+
+type RequestReviewInput struct {
+	ID string `json:"id" jsonschema:"task id (UUID)"`
+}
+
+func registerRequestReview(s *mcp.Server, admin pb.AdminServiceClient) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "request_review",
+		Description: "Move a parked `pr_opened` task to `review_requested`. Informational only.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in RequestReviewInput) (*mcp.CallToolResult, TaskDetail, error) {
+		resp, err := admin.RequestReview(ctx, &pb.RequestReviewRequest{Id: in.ID})
+		if err != nil {
+			return toolErr(err, "request_review"), TaskDetail{}, nil
+		}
+		d := fromProtoTask(resp.GetTask())
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("%s — %s", d.ID, d.Status)}},
+		}, d, nil
+	})
+}
+
+type FinalizeTaskInput struct {
+	ID      string `json:"id" jsonschema:"task id (UUID)"`
+	Outcome string `json:"outcome" jsonschema:"\"success\" or \"failure\" (required)"`
+	Message string `json:"message,omitempty" jsonschema:"failure reason; ignored on success"`
+}
+
+func registerFinalizeTask(s *mcp.Server, admin pb.AdminServiceClient) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "finalize_task",
+		Description: "Finalize a parked task with success or failure. Only allowed from `pr_opened` or `review_requested`. Always terminal — no retry.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in FinalizeTaskInput) (*mcp.CallToolResult, TaskDetail, error) {
+		req := &pb.FinalizeTaskRequest{Id: in.ID}
+		switch in.Outcome {
+		case "success":
+			req.Outcome = &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}}
+		case "failure":
+			req.Outcome = &pb.FinalizeTaskRequest_Failure_{Failure: &pb.FinalizeTaskRequest_Failure{Message: in.Message}}
+		default:
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: `finalize_task: outcome must be "success" or "failure"`}},
+			}, TaskDetail{}, nil
+		}
+		resp, err := admin.FinalizeTask(ctx, req)
+		if err != nil {
+			return toolErr(err, "finalize_task"), TaskDetail{}, nil
+		}
+		d := fromProtoTask(resp.GetTask())
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("%s — %s", d.ID, d.Status)}},
+		}, d, nil
 	})
 }
 

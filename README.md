@@ -57,6 +57,8 @@ tools:
 | `get_current_task` | Return details of the task the worker is currently holding. |
 | `update_progress` | Set the short "current status" note surfaced on the admin UI. |
 | `append_log` | Append one immutable line to the task's log. |
+| `set_jira_url` | Attach a JIRA URL to the claimed task (allowed any time during the claim). |
+| `open_pr` | Atomically transition to `pr_opened`, set `github_pr_url`, and release the claim. After this call the worker is idle; finalization is admin-only. |
 | `complete_task` | Mark the task successful and release the claim. |
 | `fail_task` | Mark the task failed with a message; mastermind retries or terminates per policy. |
 
@@ -76,6 +78,11 @@ Example `.mcp.json` for a worker running on `127.0.0.1:7777`:
 The worker binds to loopback by default and benefits from the MCP SDK's
 DNS-rebinding protection — override with `WORKER_MCP_LISTEN_ADDR` if needed,
 but do not bind publicly without adding transport-level auth.
+
+Once a worker calls `open_pr`, the task is "parked" — it leaves `in_progress`, the
+claim is released, and only an admin (via `mastermind-mcp`, `elpulpo`, or the admin
+UI) can finalize it with `complete`/`fail` or move it to `review_requested`. The
+worker is freed to claim another task immediately.
 
 ## Admin UI
 
@@ -102,7 +109,7 @@ Example `.mcp.json`:
 }
 ```
 
-Tools: `create_task`, `get_task`, `list_tasks`. See the design doc for the full input/output schemas.
+Tools: `create_task`, `get_task`, `list_tasks`, `request_review`, `finalize_task`. See the design doc for the full input/output schemas.
 
 Keep `ADMIN_TOKEN` out of version control — source it from your shell environment or a secrets manager. Set `MASTERMIND_TLS=true` when mastermind is not on localhost; otherwise the bearer token is sent in cleartext.
 
@@ -128,12 +135,21 @@ Commands:
 
 | Command | Purpose |
 | ------- | ------- |
-| `elpulpo tasks create --name NAME [flags]` | Enqueue a new task. `--payload` accepts inline JSON, `@path` for a file, or `-` for stdin. |
+| `elpulpo tasks create --name NAME [--instructions TEXT\|@file\|-] [flags]` | Enqueue a new task. Tasks created via gRPC require `payload.instructions`; `--instructions` is a convenience that wraps text into the canonical payload (mergeable with `--payload`). `--payload` accepts inline JSON, `@path` for a file, or `-` for stdin. |
 | `elpulpo tasks get <id>` | Show one task's full state. |
 | `elpulpo tasks list [flags]` | Table of tasks; filter with `--status`, paginate with `--limit`/`--offset`, emit JSON with `--json`. |
-| `elpulpo tasks cancel <id>` | Remove a task. Rejects tasks that are currently claimed or running. |
+| `elpulpo tasks cancel <id>` | Remove a task. Rejects tasks that are currently claimed, in_progress, pr_opened, or review_requested. |
 | `elpulpo tasks retry <id>` | Reset a pending/completed/failed task back to `pending` with a fresh attempt count. |
+| `elpulpo tasks request-review <id>` | Move a `pr_opened` task to `review_requested`. |
+| `elpulpo tasks finalize <id> --success` | Terminal admin completion of a parked task. |
+| `elpulpo tasks finalize <id> --fail "reason"` | Terminal admin failure of a parked task. |
 | `elpulpo workers list` | Distinct worker identities seen in the tasks table with active / completed / failed counts and last-seen timestamp. |
+
+Tasks created via the gRPC `AdminService.CreateTask` (used by `mastermind-mcp`,
+`elpulpo`, and the admin UI) must include a non-empty `payload.instructions`
+string — the canonical "what should the agent do" surface. The `elpulpo tasks
+create --instructions` flag is a convenience for setting it without hand-rolling
+the JSON.
 
 Set `MASTERMIND_TLS=true` when mastermind is not on localhost; otherwise the
 bearer token is sent in cleartext. `REQUEST_TIMEOUT` (default `15s`) caps any
