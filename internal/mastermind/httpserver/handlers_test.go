@@ -305,3 +305,190 @@ func TestDetailPage_ShowsProgressNote(t *testing.T) {
 		t.Errorf("detail missing progress_note value: %s", body)
 	}
 }
+
+// prOpenedTask creates a task and drives it to pr_opened via raw SQL,
+// mirroring what OpenPR does atomically.
+func prOpenedTask(t *testing.T, s *store.Store) store.Task {
+	t.Helper()
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "parked", MaxAttempts: 3})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if _, err := s.Pool().Exec(context.Background(),
+		`UPDATE tasks SET status='pr_opened', github_pr_url='https://github.com/o/r/pull/1',
+		 claimed_by=NULL, claimed_at=NULL, last_heartbeat_at=NULL WHERE id=$1`,
+		task.ID,
+	); err != nil {
+		t.Fatalf("force pr_opened: %v", err)
+	}
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	return got
+}
+
+func TestTasksRequestReview_RedirectsOnSuccess(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	task := prOpenedTask(t, s)
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/request-review", ""))
+	if rr.Code != http.StatusSeeOther {
+		t.Errorf("code=%d, want 303", rr.Code)
+	}
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.StatusReviewRequested {
+		t.Errorf("status=%q, want review_requested", got.Status)
+	}
+}
+
+func TestTasksRequestReview_NotFound(t *testing.T) {
+	srv := newServer(t)
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/00000000-0000-0000-0000-000000000000/request-review", ""))
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("code=%d, want 404", rr.Code)
+	}
+}
+
+func TestTasksRequestReview_RejectsFromInProgress(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{Name: "in-progress", MaxAttempts: 3})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if _, err := s.Pool().Exec(context.Background(),
+		`UPDATE tasks SET status='in_progress', claimed_by='w1' WHERE id=$1`, task.ID,
+	); err != nil {
+		t.Fatalf("force in_progress: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/request-review", ""))
+	if rr.Code != http.StatusConflict {
+		t.Errorf("code=%d, want 409", rr.Code)
+	}
+}
+
+func TestTasksFinalize_Success(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	task := prOpenedTask(t, s)
+
+	form := url.Values{"outcome": {"success"}}.Encode()
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/finalize", form))
+	if rr.Code != http.StatusSeeOther {
+		t.Errorf("code=%d, want 303", rr.Code)
+	}
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.StatusCompleted {
+		t.Errorf("status=%q, want completed", got.Status)
+	}
+}
+
+func TestTasksFinalize_Failure(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	task := prOpenedTask(t, s)
+
+	form := url.Values{"outcome": {"failure"}, "message": {"bad PR"}}.Encode()
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/finalize", form))
+	if rr.Code != http.StatusSeeOther {
+		t.Errorf("code=%d, want 303", rr.Code)
+	}
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.StatusFailed {
+		t.Errorf("status=%q, want failed", got.Status)
+	}
+	if got.LastError == nil || *got.LastError != "bad PR" {
+		t.Errorf("last_error=%v, want 'bad PR'", got.LastError)
+	}
+}
+
+func TestTasksFinalize_RejectsBadOutcome(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	task := prOpenedTask(t, s)
+
+	form := url.Values{"outcome": {"bogus"}}.Encode()
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodPost, "/tasks/"+task.ID.String()+"/finalize", form))
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("code=%d, want 400", rr.Code)
+	}
+}
+
+func TestTasksDetail_RendersInstructions(t *testing.T) {
+	srv := newServer(t)
+	s, err := store.Open(context.Background(), testDSN)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	defer s.Close()
+
+	payload := `{"instructions":"do the thing","other":"ignored"}`
+	task, err := s.CreateTask(context.Background(), store.NewTaskInput{
+		Name:        "with-instructions",
+		MaxAttempts: 3,
+		Payload:     []byte(payload),
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, authedReq(http.MethodGet, "/tasks/"+task.ID.String(), ""))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("code=%d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "do the thing") {
+		t.Errorf("detail missing instructions text: %s", body)
+	}
+	if !strings.Contains(body, "task-instructions") {
+		t.Errorf("detail missing instructions section class: %s", body)
+	}
+}

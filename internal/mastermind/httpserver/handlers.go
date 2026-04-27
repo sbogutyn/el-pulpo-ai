@@ -41,10 +41,11 @@ type formPageData struct {
 }
 
 type detailPageData struct {
-	Title string
-	Task  store.Task
-	Logs  []store.TaskLogEntry
-	Error string
+	Title        string
+	Task         store.Task
+	Instructions string
+	Logs         []store.TaskLogEntry
+	Error        string
 }
 
 func (s *Server) registerTasksRoutes() {
@@ -169,6 +170,10 @@ func (s *Server) tasksMember(w http.ResponseWriter, r *http.Request) {
 		s.tasksRequeue(w, r, id)
 	case verb == "links" && r.Method == http.MethodPost:
 		s.tasksUpdateLinks(w, r, id)
+	case verb == "request-review" && r.Method == http.MethodPost:
+		s.tasksRequestReview(w, r, id)
+	case verb == "finalize" && r.Method == http.MethodPost:
+		s.tasksFinalize(w, r, id)
 	default:
 		http.NotFound(w, r)
 	}
@@ -188,7 +193,7 @@ func (s *Server) tasksDetail(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if err != nil {
 		s.log.Warn("list task logs", "error", err, "task_id", id)
 	}
-	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Logs: logs}); err != nil {
+	if err := s.pages["tasks_detail"].ExecuteTemplate(w, "base", detailPageData{Title: task.Name, Task: task, Instructions: instructionsFrom(task.Payload), Logs: logs}); err != nil {
 		s.log.Error("render tasks_detail", "error", err)
 		http.Error(w, "render error", http.StatusInternalServerError)
 	}
@@ -310,6 +315,46 @@ func (s *Server) tasksDelete(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 }
 
+func (s *Server) tasksRequestReview(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	switch err := s.store.RequestReview(r.Context(), id); {
+	case err == nil:
+		http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+	case errors.Is(err, store.ErrNotFound):
+		http.NotFound(w, r)
+	case errors.Is(err, store.ErrInvalidTransition):
+		http.Error(w, "task is not in pr_opened", http.StatusConflict)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) tasksFinalize(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var success bool
+	switch r.PostFormValue("outcome") {
+	case "success":
+		success = true
+	case "failure":
+		success = false
+	default:
+		http.Error(w, `outcome must be "success" or "failure"`, http.StatusBadRequest)
+		return
+	}
+	switch err := s.store.FinalizeTask(r.Context(), id, success, r.PostFormValue("message")); {
+	case err == nil:
+		http.Redirect(w, r, "/tasks/"+id.String(), http.StatusSeeOther)
+	case errors.Is(err, store.ErrNotFound):
+		http.NotFound(w, r)
+	case errors.Is(err, store.ErrInvalidTransition):
+		http.Error(w, "task is not in pr_opened or review_requested", http.StatusConflict)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) tasksRequeue(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	switch _, err := s.store.RequeueTask(r.Context(), id); {
 	case errors.Is(err, store.ErrNotFound):
@@ -328,6 +373,22 @@ func (s *Server) tasksRequeue(w http.ResponseWriter, r *http.Request, id uuid.UU
 }
 
 // ---- helpers ----
+
+// instructionsFrom extracts the canonical "instructions" text from a task
+// payload. Returns "" when the payload isn't a JSON object or doesn't carry
+// the key.
+func instructionsFrom(payload []byte) string {
+	if len(payload) == 0 {
+		return ""
+	}
+	var v struct {
+		Instructions string `json:"instructions"`
+	}
+	if err := json.Unmarshal(payload, &v); err != nil {
+		return ""
+	}
+	return v.Instructions
+}
 
 func parseTaskForm(r *http.Request) (taskForm, store.NewTaskInput, error) {
 	if err := r.ParseForm(); err != nil {

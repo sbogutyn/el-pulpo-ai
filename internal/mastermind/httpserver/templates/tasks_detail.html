@@ -1,6 +1,12 @@
 {{ define "content" }}
 <h1>{{ .Task.Name }}</h1>
 {{ if .Error }}<p role="alert">{{ .Error }}</p>{{ end }}
+{{ if .Instructions }}
+<section class="task-instructions">
+  <h2>Instructions</h2>
+  <pre class="instructions">{{ .Instructions }}</pre>
+</section>
+{{ end }}
 <p><strong>Status:</strong> {{ .Task.Status }}</p>
 <p><strong>Priority:</strong> {{ .Task.Priority }}</p>
 <p><strong>Attempts:</strong> {{ .Task.AttemptCount }} / {{ .Task.MaxAttempts }}</p>
@@ -65,6 +71,28 @@
       <button type="submit" class="contrast">Delete</button>
     </form>
   {{ end }}{{ end }}
+  {{ if eq (printf "%s" .Task.Status) "pr_opened" }}
+    <form method="post" action="/tasks/{{ .Task.ID }}/request-review">
+      <button type="submit">Mark reviewed</button>
+    </form>
+  {{ end }}
+  {{ if or (eq (printf "%s" .Task.Status) "pr_opened") (eq (printf "%s" .Task.Status) "review_requested") }}
+    <form method="post" action="/tasks/{{ .Task.ID }}/finalize">
+      <fieldset>
+        <legend>Finalize</legend>
+        <label>Outcome
+          <select name="outcome">
+            <option value="success">success</option>
+            <option value="failure">failure</option>
+          </select>
+        </label>
+        <label>Message
+          <input type="text" name="message" placeholder="(failure reason, optional)">
+        </label>
+        <button type="submit">Finalize</button>
+      </fieldset>
+    </form>
+  {{ end }}
 </div>
 <p><a href="/tasks">← back</a></p>
 {{ end }}
