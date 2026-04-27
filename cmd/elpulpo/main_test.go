@@ -113,7 +113,7 @@ func TestSmoke_CLI_RoundTrip(t *testing.T) {
 	}
 
 	// 1. create
-	out := run(t, "tasks", "create", "--name", "indexer", "--payload", `{"k":"v"}`)
+	out := run(t, "tasks", "create", "--name", "indexer", "--payload", `{"instructions":"index the repo","k":"v"}`)
 	if !strings.Contains(out, "indexer") {
 		t.Fatalf("create output missing task name: %s", out)
 	}

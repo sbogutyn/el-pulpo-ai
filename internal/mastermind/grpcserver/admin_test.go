@@ -85,7 +85,7 @@ func TestCreateTask_Happy(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
 	resp, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{
 		Name:        "indexer-run",
-		Payload:     []byte(`{"k":"v"}`),
+		Payload:     []byte(`{"instructions":"index the repo","k":"v"}`),
 		Priority:    5,
 		MaxAttempts: 2,
 	})
@@ -138,7 +138,7 @@ func TestCreateTask_RejectsWorkerToken(t *testing.T) {
 
 func TestCreateTask_DefaultsMaxAttempts(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
-	resp, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "x"})
+	resp, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "x", Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -151,6 +151,7 @@ func TestCreateTask_IssueRefsRoundTrip(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
 	resp, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{
 		Name:        "with-refs",
+		Payload:     []byte(`{"instructions":"test"}`),
 		JiraUrl:     "https://pulpo.atlassian.net/browse/PULPO-1",
 		GithubPrUrl: "https://github.com/sbogutyn/el-pulpo-ai/pull/1",
 	})
@@ -167,7 +168,7 @@ func TestCreateTask_IssueRefsRoundTrip(t *testing.T) {
 
 func TestGetTask_Happy(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
-	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"})
+	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestGetTask_NotFound(t *testing.T) {
 func TestListTasks_EmptyFilter(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
 	for i := 0; i < 3; i++ {
-		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"}); err != nil {
+		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -219,7 +220,7 @@ func TestListTasks_EmptyFilter(t *testing.T) {
 func TestListTasks_StatusFilter(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
 	for i := 0; i < 2; i++ {
-		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"}); err != nil {
+		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -249,7 +250,7 @@ func TestListTasks_BadStatus(t *testing.T) {
 
 func TestListTaskLogs_Happy(t *testing.T) {
 	admin, tasks, _ := startAdminBufServer(t)
-	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"})
+	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +288,7 @@ func TestListTaskLogs_UnknownTask(t *testing.T) {
 func TestListTasks_Pagination(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
 	for i := 0; i < 5; i++ {
-		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"}); err != nil {
+		if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -300,5 +301,59 @@ func TestListTasks_Pagination(t *testing.T) {
 	}
 	if len(resp.Items) != 2 {
 		t.Errorf("len(Items)=%d, want 2", len(resp.Items))
+	}
+}
+
+func TestCreateTask_RequiresInstructions(t *testing.T) {
+	ctx := context.Background()
+	s, _ := store.Open(ctx, testDSN)
+	defer s.Close()
+	if _, err := s.Pool().Exec(ctx, "TRUNCATE TABLE tasks CASCADE"); err != nil {
+		t.Fatal(err)
+	}
+
+	a := NewAdmin(s)
+
+	cases := []struct {
+		name    string
+		payload []byte
+	}{
+		{"missing key", []byte(`{}`)},
+		{"empty string", []byte(`{"instructions":""}`)},
+		{"whitespace", []byte(`{"instructions":"   "}`)},
+		{"wrong type", []byte(`{"instructions":42}`)},
+		{"not json", []byte(`not-json`)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := a.CreateTask(ctx, &pb.CreateTaskRequest{
+				Name:    "t",
+				Payload: tc.payload,
+			})
+			if status.Code(err) != codes.InvalidArgument {
+				t.Fatalf("got %v, want InvalidArgument", err)
+			}
+		})
+	}
+}
+
+func TestCreateTask_AcceptsValidInstructions(t *testing.T) {
+	ctx := context.Background()
+	s, _ := store.Open(ctx, testDSN)
+	defer s.Close()
+	if _, err := s.Pool().Exec(ctx, "TRUNCATE TABLE tasks CASCADE"); err != nil {
+		t.Fatal(err)
+	}
+
+	a := NewAdmin(s)
+	resp, err := a.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name:    "t",
+		Payload: []byte(`{"instructions":"do the thing"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if resp.GetTask().GetId() == "" {
+		t.Error("missing id")
 	}
 }

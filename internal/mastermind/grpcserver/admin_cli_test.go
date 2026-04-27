@@ -11,7 +11,7 @@ import (
 
 func TestCancelTask_PendingHappy(t *testing.T) {
 	admin, _, _ := startAdminBufServer(t)
-	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "cancel-me"})
+	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "cancel-me", Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestCancelTask_NotFound(t *testing.T) {
 
 func TestCancelTask_RefusesClaimed(t *testing.T) {
 	admin, tasks, _ := startAdminBufServer(t)
-	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"})
+	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestCancelTask_RefusesClaimed(t *testing.T) {
 
 func TestRetryTask_CompletedHappy(t *testing.T) {
 	admin, tasks, _ := startAdminBufServer(t)
-	if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"}); err != nil {
+	if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	claim, err := tasks.ClaimTask(workerCtx(), &pb.ClaimTaskRequest{WorkerId: "w1"})
@@ -88,7 +88,7 @@ func TestRetryTask_CompletedHappy(t *testing.T) {
 
 func TestRetryTask_RefusesClaimed(t *testing.T) {
 	admin, tasks, _ := startAdminBufServer(t)
-	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t"})
+	created, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t", Payload: []byte(`{"instructions":"test"}`)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,10 +112,10 @@ func TestRetryTask_NotFound(t *testing.T) {
 func TestListWorkers_Aggregates(t *testing.T) {
 	admin, tasks, _ := startAdminBufServer(t)
 	// Seed two tasks, claimed by two different workers.
-	if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t1"}); err != nil {
+	if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t1", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t2"}); err != nil {
+	if _, err := admin.CreateTask(adminCtx(), &pb.CreateTaskRequest{Name: "t2", Payload: []byte(`{"instructions":"test"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tasks.ClaimTask(workerCtx(), &pb.ClaimTaskRequest{WorkerId: "worker-a"}); err != nil {

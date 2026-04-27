@@ -34,7 +34,7 @@ func TestCreateTaskTool_Happy(t *testing.T) {
 
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "create_task",
-		Arguments: map[string]any{"name": "build", "priority": 5},
+		Arguments: map[string]any{"name": "build", "priority": 5, "payload": map[string]any{"instructions": "build the project"}},
 	})
 	if err != nil {
 		t.Fatalf("CallTool: %v", err)
@@ -69,7 +69,7 @@ func TestCreateTaskTool_WithPayload(t *testing.T) {
 		Name: "create_task",
 		Arguments: map[string]any{
 			"name":    "indexer",
-			"payload": map[string]any{"repo": "pulpo", "since": "2026-04-01"},
+			"payload": map[string]any{"instructions": "index the repo", "repo": "pulpo", "since": "2026-04-01"},
 		},
 	})
 	if err != nil {
@@ -116,7 +116,7 @@ func TestGetTaskTool_Happy(t *testing.T) {
 
 	created, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "create_task",
-		Arguments: map[string]any{"name": "x"},
+		Arguments: map[string]any{"name": "x", "payload": map[string]any{"instructions": "test"}},
 	})
 	if err != nil || created.IsError {
 		t.Fatalf("seed CreateTask: %v %+v", err, created)
@@ -171,7 +171,7 @@ func TestListTasksTool_Happy(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		_, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 			Name:      "create_task",
-			Arguments: map[string]any{"name": "x"},
+			Arguments: map[string]any{"name": "x", "payload": map[string]any{"instructions": "test"}},
 		})
 		if err != nil {
 			t.Fatalf("seed: %v", err)
