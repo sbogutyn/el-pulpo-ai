@@ -148,3 +148,119 @@ func TestClaimTask_WithDeadline_StillReturnsNotFound(t *testing.T) {
 		t.Errorf("code=%v, want NotFound", status.Code(err))
 	}
 }
+
+func TestSetJiraURL_HappyPath(t *testing.T) {
+	client, s := startBufServer(t)
+	ctx := context.Background()
+
+	created, err := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if _, err := client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"}); err != nil {
+		t.Fatalf("ClaimTask: %v", err)
+	}
+
+	if _, err := client.SetJiraURL(ctx, &pb.SetJiraURLRequest{
+		WorkerId: "w1",
+		TaskId:   created.ID.String(),
+		Url:      "https://jira/T-1",
+	}); err != nil {
+		t.Fatalf("SetJiraURL: %v", err)
+	}
+}
+
+func TestSetJiraURL_NotOwnerReturnsFailedPrecondition(t *testing.T) {
+	client, s := startBufServer(t)
+	ctx := context.Background()
+
+	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+
+	_, err := client.SetJiraURL(ctx, &pb.SetJiraURLRequest{
+		WorkerId: "w2",
+		TaskId:   created.ID.String(),
+		Url:      "https://jira/T-1",
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("code=%v, want FailedPrecondition", status.Code(err))
+	}
+}
+
+func TestSetJiraURL_MissingWorkerID(t *testing.T) {
+	client, _ := startBufServer(t)
+	_, err := client.SetJiraURL(context.Background(), &pb.SetJiraURLRequest{
+		WorkerId: "",
+		TaskId:   "00000000-0000-0000-0000-000000000000",
+		Url:      "https://jira/T-1",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestSetJiraURL_BadTaskID(t *testing.T) {
+	client, _ := startBufServer(t)
+	_, err := client.SetJiraURL(context.Background(), &pb.SetJiraURLRequest{
+		WorkerId: "w1",
+		TaskId:   "not-a-uuid",
+		Url:      "https://jira/T-1",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestOpenPR_HappyPath(t *testing.T) {
+	client, s := startBufServer(t)
+	ctx := context.Background()
+
+	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	if _, err := client.Heartbeat(ctx, &pb.HeartbeatRequest{
+		WorkerId: "w1",
+		TaskId:   created.ID.String(),
+	}); err != nil {
+		t.Fatalf("Heartbeat: %v", err)
+	}
+
+	if _, err := client.OpenPR(ctx, &pb.OpenPRRequest{
+		WorkerId:    "w1",
+		TaskId:      created.ID.String(),
+		GithubPrUrl: "https://github.com/o/r/pull/1",
+	}); err != nil {
+		t.Fatalf("OpenPR: %v", err)
+	}
+}
+
+func TestOpenPR_EmptyURLReturnsInvalidArgument(t *testing.T) {
+	client, _ := startBufServer(t)
+	_, err := client.OpenPR(context.Background(), &pb.OpenPRRequest{
+		WorkerId:    "w1",
+		TaskId:      "00000000-0000-0000-0000-000000000000",
+		GithubPrUrl: "",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("code=%v, want InvalidArgument", status.Code(err))
+	}
+}
+
+func TestOpenPR_NotOwnerReturnsFailedPrecondition(t *testing.T) {
+	client, s := startBufServer(t)
+	ctx := context.Background()
+
+	created, _ := s.CreateTask(ctx, store.NewTaskInput{Name: "t", MaxAttempts: 3})
+	_, _ = client.ClaimTask(ctx, &pb.ClaimTaskRequest{WorkerId: "w1"})
+	_, _ = client.Heartbeat(ctx, &pb.HeartbeatRequest{
+		WorkerId: "w1", TaskId: created.ID.String(),
+	})
+
+	_, err := client.OpenPR(context.Background(), &pb.OpenPRRequest{
+		WorkerId:    "w2",
+		TaskId:      created.ID.String(),
+		GithubPrUrl: "https://github.com/o/r/pull/1",
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("code=%v, want FailedPrecondition", status.Code(err))
+	}
+}
