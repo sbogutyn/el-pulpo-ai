@@ -132,15 +132,16 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `elpulpo — admin CLI for the mastermind task queue
 
 Usage:
-  elpulpo tasks create   --name NAME [--payload JSON] [--priority N]
-                         [--max-attempts N] [--scheduled-for RFC3339]
-                         [--jira-url URL] [--github-pr-url URL]
-  elpulpo tasks get      <id>
-  elpulpo tasks list     [--status STATUS] [--limit N] [--offset N]
-                         [--json]
-  elpulpo tasks cancel   <id>
-  elpulpo tasks retry    <id>
-  elpulpo workers list   [--json]
+  elpulpo tasks create        --name NAME [--instructions TEXT|@file|-] [--payload JSON]
+                              [--priority N] [--max-attempts N] [--scheduled-for RFC3339]
+                              [--jira-url URL] [--github-pr-url URL]
+  elpulpo tasks get           <id>
+  elpulpo tasks list          [--status STATUS] [--limit N] [--offset N] [--json]
+  elpulpo tasks cancel        <id>
+  elpulpo tasks retry         <id>
+  elpulpo tasks request-review <id>
+  elpulpo tasks finalize      <id> --success | --fail "reason"
+  elpulpo workers list        [--json]
 
 Environment:
   MASTERMIND_ADDR   host:port of mastermind gRPC (required)
