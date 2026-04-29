@@ -52,6 +52,13 @@ func TestMain(m *testing.M) {
 		log.Printf("e2e: mastermind-mcp built at %s", bin)
 	}
 
+	if elBin, err := BuildElpulpoBinary(ctx, root, filepath.Join(root, "e2e", ".bin", "elpulpo")); err != nil {
+		log.Printf("e2e: WARN: could not build elpulpo: %v", err)
+	} else {
+		S.ElpulpoBin = elBin
+		log.Printf("e2e: elpulpo built at %s", elBin)
+	}
+
 	code := m.Run()
 
 	downCtx, downCancel := context.WithTimeout(context.Background(), 2*time.Minute)

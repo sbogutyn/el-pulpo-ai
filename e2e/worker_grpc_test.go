@@ -32,7 +32,9 @@ func claimWithName(t *testing.T, worker pb.TaskServiceClient, admin pb.AdminServ
 	defer cancel()
 	// Boost priority so our task is claimed before other pending tasks.
 	// claimTask orders by priority DESC, then created_at ASC.
-	if _, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, Priority: 1000}); err != nil {
+	if _, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name: name, Priority: 1000, Payload: instructionsPayload(nil),
+	}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	const maxAttempts = 50
@@ -242,7 +244,9 @@ func TestWorkerGRPC_ReportRetry(t *testing.T) {
 
 	name := "worker-grpc-retry-" + shortID()
 	// max_attempts=3 so first failure retries.
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, MaxAttempts: 3})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name: name, MaxAttempts: 3, Payload: instructionsPayload(nil),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +311,9 @@ func TestWorkerGRPC_ReportTerminal(t *testing.T) {
 
 	// max_attempts=1 so one failure is terminal.
 	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
-		Name: "worker-grpc-terminal-" + shortID(), MaxAttempts: 1,
+		Name:    "worker-grpc-terminal-" + shortID(),
+		MaxAttempts: 1,
+		Payload: instructionsPayload(nil),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -352,6 +358,176 @@ func TestWorkerGRPC_ReportTerminal(t *testing.T) {
 	if got.GetTask().GetLastError() != "boom" {
 		t.Errorf("last_error=%q want %q", got.GetTask().GetLastError(), "boom")
 	}
+}
+
+// TestWorkerGRPC_HeartbeatPromotesToInProgress covers the master-side
+// rename from `running` to `in_progress`: the first heartbeat on a
+// claimed task must flip its status string to "in_progress" (the
+// migration renamed the enum value, so a test that hard-codes the
+// string protects the API contract from a silent rename in either
+// direction).
+func TestWorkerGRPC_HeartbeatPromotesToInProgress(t *testing.T) {
+	requireEndpointsReady(t)
+	worker := workerClient(t)
+	admin := adminClient(t)
+
+	wid := "e2e-progress-" + shortID()
+	id := claimWithName(t, worker, admin, wid, "worker-grpc-progress-"+shortID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := worker.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: wid, TaskId: id}); err != nil {
+		t.Fatalf("Heartbeat: %v", err)
+	}
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "in_progress" {
+		t.Errorf("status=%q want in_progress", got.GetTask().GetStatus())
+	}
+
+	// Cleanup.
+	_, _ = worker.ReportResult(ctx, &pb.ReportResultRequest{
+		WorkerId: wid, TaskId: id,
+		Outcome: &pb.ReportResultRequest_Success_{Success: &pb.ReportResultRequest_Success{}},
+	})
+}
+
+// TestWorkerGRPC_SetJiraURL exercises the new TaskService.SetJiraURL RPC.
+// SetJiraURL is allowed any time the worker holds the claim (claimed or
+// in_progress), and surfaces on the task as `jira_url`.
+func TestWorkerGRPC_SetJiraURL(t *testing.T) {
+	requireEndpointsReady(t)
+	worker := workerClient(t)
+	admin := adminClient(t)
+
+	wid := "e2e-jira-" + shortID()
+	id := claimWithName(t, worker, admin, wid, "worker-grpc-jira-"+shortID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	const url = "https://acme.atlassian.net/browse/E2E-1"
+	if _, err := worker.SetJiraURL(ctx, &pb.SetJiraURLRequest{
+		WorkerId: wid, TaskId: id, Url: url,
+	}); err != nil {
+		t.Fatalf("SetJiraURL: %v", err)
+	}
+
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetJiraUrl() != url {
+		t.Errorf("jira_url=%q want %q", got.GetTask().GetJiraUrl(), url)
+	}
+
+	// Foreign worker cannot set the URL.
+	_, err = worker.SetJiraURL(ctx, &pb.SetJiraURLRequest{
+		WorkerId: "someone-else", TaskId: id, Url: url,
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("foreign SetJiraURL: code=%s want FailedPrecondition", status.Code(err))
+	}
+
+	// Cleanup: complete via the original worker.
+	_, _ = worker.ReportResult(ctx, &pb.ReportResultRequest{
+		WorkerId: wid, TaskId: id,
+		Outcome: &pb.ReportResultRequest_Success_{Success: &pb.ReportResultRequest_Success{}},
+	})
+}
+
+// TestWorkerGRPC_OpenPR drives a task through the new parked-PR flow:
+// claim → heartbeat (claimed → in_progress) → OpenPR → admin sees
+// status=pr_opened, github_pr_url set, claim released. The reaper must
+// then *not* requeue the task even though the heartbeat is stale.
+func TestWorkerGRPC_OpenPR(t *testing.T) {
+	requireEndpointsReady(t)
+	worker := workerClient(t)
+	admin := adminClient(t)
+
+	wid := "e2e-openpr-" + shortID()
+	id := claimWithName(t, worker, admin, wid, "worker-grpc-openpr-"+shortID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Heartbeat once to flip claimed → in_progress: OpenPR is only
+	// allowed from in_progress per the transition allow-list.
+	if _, err := worker.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: wid, TaskId: id}); err != nil {
+		t.Fatalf("Heartbeat: %v", err)
+	}
+
+	const prURL = "https://github.com/org/repo/pull/777"
+	if _, err := worker.OpenPR(ctx, &pb.OpenPRRequest{
+		WorkerId: wid, TaskId: id, GithubPrUrl: prURL,
+	}); err != nil {
+		t.Fatalf("OpenPR: %v", err)
+	}
+
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "pr_opened" {
+		t.Errorf("status=%q want pr_opened", got.GetTask().GetStatus())
+	}
+	if got.GetTask().GetGithubPrUrl() != prURL {
+		t.Errorf("github_pr_url=%q want %q", got.GetTask().GetGithubPrUrl(), prURL)
+	}
+	if got.GetTask().GetClaimedBy() != "" {
+		t.Errorf("claim not released: claimed_by=%q", got.GetTask().GetClaimedBy())
+	}
+
+	// The worker is now idle: a second OpenPR with the same id must
+	// fail because the worker no longer owns the claim.
+	_, err = worker.OpenPR(ctx, &pb.OpenPRRequest{
+		WorkerId: wid, TaskId: id, GithubPrUrl: prURL,
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("second OpenPR: code=%s want FailedPrecondition", status.Code(err))
+	}
+
+	// Cleanup: the parked task is finalized via admin in
+	// TestAdminGRPC_FinalizeTask_ tests; here we hand it off by
+	// finalising it as a success so subsequent tests see a clean queue.
+	if _, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	}); err != nil {
+		t.Fatalf("cleanup FinalizeTask: %v", err)
+	}
+}
+
+// TestWorkerGRPC_OpenPR_RejectsEmptyURL covers the InvalidArgument case
+// surfaced when github_pr_url is empty — the store rejects the call
+// before any state mutation.
+func TestWorkerGRPC_OpenPR_RejectsEmptyURL(t *testing.T) {
+	requireEndpointsReady(t)
+	worker := workerClient(t)
+	admin := adminClient(t)
+
+	wid := "e2e-openpr-empty-" + shortID()
+	id := claimWithName(t, worker, admin, wid, "worker-grpc-openpr-empty-"+shortID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Heartbeat to flip into in_progress.
+	if _, err := worker.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: wid, TaskId: id}); err != nil {
+		t.Fatalf("Heartbeat: %v", err)
+	}
+	_, err := worker.OpenPR(ctx, &pb.OpenPRRequest{WorkerId: wid, TaskId: id, GithubPrUrl: ""})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("empty github_pr_url: code=%s want InvalidArgument", status.Code(err))
+	}
+
+	// Cleanup.
+	_, _ = worker.ReportResult(ctx, &pb.ReportResultRequest{
+		WorkerId: wid, TaskId: id,
+		Outcome: &pb.ReportResultRequest_Success_{Success: &pb.ReportResultRequest_Success{}},
+	})
 }
 
 func TestAuthMatrix_GRPC(t *testing.T) {

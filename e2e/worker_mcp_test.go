@@ -40,6 +40,8 @@ func TestWorkerMCP_ToolsList(t *testing.T) {
 		"get_current_task": false,
 		"update_progress":  false,
 		"append_log":       false,
+		"set_jira_url":     false,
+		"open_pr":          false,
 		"complete_task":    false,
 		"fail_task":        false,
 	}
@@ -84,7 +86,7 @@ func TestWorkerMCP_ClaimAndComplete(t *testing.T) {
 	defer cancel()
 
 	name := "worker-mcp-claim-" + shortID()
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, MaxAttempts: 2})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, MaxAttempts: 2, Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +189,7 @@ func TestWorkerMCP_FailRetries(t *testing.T) {
 	defer cancel()
 
 	name := "worker-mcp-fail-" + shortID()
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, MaxAttempts: 1})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, MaxAttempts: 1, Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,4 +231,191 @@ func TestWorkerMCP_FailRetries(t *testing.T) {
 	if !strings.Contains(got.GetTask().GetLastError(), "boom via MCP") {
 		t.Errorf("last_error=%q want contains 'boom via MCP'", got.GetTask().GetLastError())
 	}
+}
+
+// TestWorkerMCP_SetJiraURL covers the new set_jira_url tool: a worker
+// holding a claim attaches a JIRA URL, and admin sees it on the task.
+func TestWorkerMCP_SetJiraURL(t *testing.T) {
+	requireEndpointsReady(t)
+	workerMCP_drain(t)
+	admin := adminClient(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	name := "worker-mcp-jira-" + shortID()
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, Payload: instructionsPayload(nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.GetTask().GetId()
+
+	sess := connectWorkerMCP(t)
+	for i := 0; i < 20; i++ {
+		res := callTool(t, sess, "claim_next_task", struct{}{})
+		if res.IsError {
+			t.Fatalf("claim_next_task: %q", toolText(res))
+		}
+		var v struct {
+			ID string `json:"id"`
+		}
+		if err := decodeStructured(res, &v); err != nil {
+			t.Fatal(err)
+		}
+		if v.ID == id {
+			break
+		}
+		_ = callTool(t, sess, "complete_task", struct{}{})
+	}
+
+	const url = "https://acme.atlassian.net/browse/E2E-9"
+	jira := callTool(t, sess, "set_jira_url", map[string]any{"url": url})
+	if jira.IsError {
+		t.Fatalf("set_jira_url: %q", toolText(jira))
+	}
+
+	// Empty URL must be a tool error.
+	bad := callTool(t, sess, "set_jira_url", map[string]any{"url": ""})
+	if !bad.IsError {
+		t.Fatalf("set_jira_url('') should be IsError=true")
+	}
+
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetJiraUrl() != url {
+		t.Errorf("jira_url=%q want %q", got.GetTask().GetJiraUrl(), url)
+	}
+
+	// Cleanup.
+	_ = callTool(t, sess, "complete_task", struct{}{})
+}
+
+// TestWorkerMCP_OpenPR covers the new open_pr tool: claim → progress
+// (forces in_progress), open_pr; admin sees status=pr_opened, pr_url
+// set, claim released. The worker is then idle so it can claim again.
+func TestWorkerMCP_OpenPR(t *testing.T) {
+	requireEndpointsReady(t)
+	workerMCP_drain(t)
+	admin := adminClient(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := "worker-mcp-openpr-" + shortID()
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, Payload: instructionsPayload(nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.GetTask().GetId()
+
+	sess := connectWorkerMCP(t)
+	for i := 0; i < 20; i++ {
+		res := callTool(t, sess, "claim_next_task", struct{}{})
+		if res.IsError {
+			t.Fatalf("claim_next_task: %q", toolText(res))
+		}
+		var v struct {
+			ID string `json:"id"`
+		}
+		if err := decodeStructured(res, &v); err != nil {
+			t.Fatal(err)
+		}
+		if v.ID == id {
+			break
+		}
+		_ = callTool(t, sess, "complete_task", struct{}{})
+	}
+
+	// update_progress flips claimed → in_progress (the only state
+	// open_pr accepts).
+	_ = callTool(t, sess, "update_progress", map[string]any{"note": "PR ready"})
+
+	// Empty URL is a tool error.
+	bad := callTool(t, sess, "open_pr", map[string]any{"github_pr_url": ""})
+	if !bad.IsError {
+		t.Fatalf("open_pr('') should be IsError=true")
+	}
+
+	const prURL = "https://github.com/org/repo/pull/777"
+	res := callTool(t, sess, "open_pr", map[string]any{"github_pr_url": prURL})
+	if res.IsError {
+		t.Fatalf("open_pr: %q", toolText(res))
+	}
+
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "pr_opened" {
+		t.Errorf("status=%q want pr_opened", got.GetTask().GetStatus())
+	}
+	if got.GetTask().GetGithubPrUrl() != prURL {
+		t.Errorf("github_pr_url=%q want %q", got.GetTask().GetGithubPrUrl(), prURL)
+	}
+	if got.GetTask().GetClaimedBy() != "" {
+		t.Errorf("claim not released: claimed_by=%q", got.GetTask().GetClaimedBy())
+	}
+
+	// After open_pr the worker is idle: get_current_task must error.
+	cur := callTool(t, sess, "get_current_task", struct{}{})
+	if !cur.IsError {
+		t.Errorf("after open_pr, get_current_task should be IsError=true: %q", toolText(cur))
+	}
+
+	// Cleanup: finalize via admin.
+	if _, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	}); err != nil {
+		t.Fatalf("cleanup FinalizeTask: %v", err)
+	}
+}
+
+// TestWorkerMCP_ClaimSurfacesInstructions covers the worker MCP TaskView
+// shape: `instructions` is split out of payload so the agent sees it
+// directly on the response of claim_next_task / get_current_task.
+func TestWorkerMCP_ClaimSurfacesInstructions(t *testing.T) {
+	requireEndpointsReady(t)
+	workerMCP_drain(t)
+	admin := adminClient(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	name := "worker-mcp-instr-" + shortID()
+	const text = "implement the worker MCP TaskView"
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name: name, Payload: instructionsPayload(map[string]any{"instructions": text}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.GetTask().GetId()
+
+	sess := connectWorkerMCP(t)
+	var seen string
+	for i := 0; i < 20; i++ {
+		res := callTool(t, sess, "claim_next_task", struct{}{})
+		if res.IsError {
+			t.Fatalf("claim_next_task: %q", toolText(res))
+		}
+		var v struct {
+			ID           string `json:"id"`
+			Instructions string `json:"instructions"`
+		}
+		if err := decodeStructured(res, &v); err != nil {
+			t.Fatal(err)
+		}
+		if v.ID == id {
+			seen = v.Instructions
+			break
+		}
+		_ = callTool(t, sess, "complete_task", struct{}{})
+	}
+	if seen != text {
+		t.Errorf("instructions=%q want %q", seen, text)
+	}
+	_ = callTool(t, sess, "complete_task", struct{}{})
 }

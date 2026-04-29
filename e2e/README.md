@@ -82,10 +82,12 @@ ephemeral e2e stack.
 | `worker_grpc_test.go` | `TaskService` coverage + auth matrix. |
 | `admin_http_test.go` | Admin UI + HTMX fragment + static auth. |
 | `probes_test.go` | `/healthz`, `/readyz`, `/metrics`, worker `/healthz`. |
-| `worker_mcp_test.go` | Worker MCP tools: claim/get/progress/log/complete/fail. |
-| `mastermind_mcp_test.go` | `mastermind-mcp` stdio tools + auth failure. |
-| `reaper_test.go` | Lease expiration → requeue / terminal. |
-| `journey_test.go` | End-to-end integration across all three binaries. |
+| `worker_mcp_test.go` | Worker MCP tools: claim/get/progress/log/set_jira_url/open_pr/complete/fail. |
+| `mastermind_mcp_test.go` | `mastermind-mcp` stdio tools (incl. request_review/finalize_task) + auth failure. |
+| `reaper_test.go` | Lease expiration → requeue / terminal; parked tasks are skipped. |
+| `dashboard_test.go` | `/dashboard`, `/dashboard/fragment`, `/wireframes` (auth + content). |
+| `cli_test.go` | `elpulpo` admin CLI: create with `--instructions`, request-review, finalize. |
+| `journey_test.go` | End-to-end integration: classic complete + parked-PR pipeline. |
 
 ## Requirements
 

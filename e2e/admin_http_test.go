@@ -77,10 +77,11 @@ func TestHTTP_CreateTask(t *testing.T) {
 	requireEndpointsReady(t)
 	name := "http-create-" + shortID()
 	form := url.Values{
-		"name":        {name},
-		"priority":    {"5"},
+		"name":         {name},
+		"priority":     {"5"},
 		"max_attempts": {"2"},
-		"payload":     {`{"source":"http-test"}`},
+		"instructions": {"do the http test"},
+		"payload":      {`{"source":"http-test"}`},
 	}
 	resp := httpRequest(t, http.MethodPost, "/tasks", form, true)
 	if resp.StatusCode != http.StatusSeeOther {
@@ -108,7 +109,12 @@ func TestHTTP_TaskDetail(t *testing.T) {
 
 	// Create via admin gRPC so this test is independent of the create
 	// HTTP test.
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-detail-" + shortID()})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name: "http-detail-" + shortID(),
+		Payload: instructionsPayload(map[string]any{
+			"instructions": "ship the detail page",
+		}),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +128,13 @@ func TestHTTP_TaskDetail(t *testing.T) {
 	if !strings.Contains(body, id) {
 		t.Errorf("detail page missing id %s; body=%q", id, body[:min(500, len(body))])
 	}
+	// The detail page renders payload.instructions in a dedicated section.
+	if !strings.Contains(body, "ship the detail page") {
+		t.Errorf("detail page missing instructions text; body=%q", body[:min(500, len(body))])
+	}
+	if !strings.Contains(body, "task-instructions") {
+		t.Errorf("detail page missing task-instructions section class")
+	}
 }
 
 func TestHTTP_EditForm(t *testing.T) {
@@ -130,7 +143,7 @@ func TestHTTP_EditForm(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-edit-" + shortID()})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-edit-" + shortID(), Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +164,7 @@ func TestHTTP_UpdateTask(t *testing.T) {
 	admin := adminClient(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-update-" + shortID()})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-update-" + shortID(), Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,10 +172,11 @@ func TestHTTP_UpdateTask(t *testing.T) {
 
 	newName := "http-updated-" + shortID()
 	form := url.Values{
-		"name":        {newName},
-		"priority":    {"7"},
+		"name":         {newName},
+		"priority":     {"7"},
 		"max_attempts": {"5"},
-		"payload":     {"{}"},
+		"instructions": {"updated"},
+		"payload":      {"{}"},
 	}
 	resp := httpRequest(t, http.MethodPost, "/tasks/"+id, form, true)
 	if resp.StatusCode != http.StatusSeeOther {
@@ -185,7 +199,7 @@ func TestHTTP_UpdateLinks(t *testing.T) {
 	admin := adminClient(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-links-" + shortID()})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-links-" + shortID(), Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +280,7 @@ func TestHTTP_Delete(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-delete-" + shortID()})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "http-delete-" + shortID(), Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,6 +294,166 @@ func TestHTTP_Delete(t *testing.T) {
 	_, err = admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
 	if err == nil {
 		t.Fatal("expected NotFound after delete, got task")
+	}
+}
+
+// TestHTTP_RequestReview drives the parked-task pipeline through the
+// admin UI: park via worker gRPC, POST /tasks/{id}/request-review, verify
+// status moved to review_requested.
+func TestHTTP_RequestReview(t *testing.T) {
+	requireEndpointsReady(t)
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/300")
+
+	resp := httpRequest(t, http.MethodPost, "/tasks/"+id+"/request-review", url.Values{}, true)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status=%d want 303 (body=%s)", resp.StatusCode, readBodyLimited(resp.Body, 512))
+	}
+
+	admin := adminClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "review_requested" {
+		t.Errorf("status=%q want review_requested", got.GetTask().GetStatus())
+	}
+
+	// Cleanup.
+	if _, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	}); err != nil {
+		t.Fatalf("cleanup FinalizeTask: %v", err)
+	}
+}
+
+// TestHTTP_FinalizeSuccess covers /tasks/{id}/finalize with outcome=success.
+func TestHTTP_FinalizeSuccess(t *testing.T) {
+	requireEndpointsReady(t)
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/301")
+
+	resp := httpRequest(t, http.MethodPost, "/tasks/"+id+"/finalize", url.Values{
+		"outcome": {"success"},
+	}, true)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status=%d want 303 (body=%s)", resp.StatusCode, readBodyLimited(resp.Body, 512))
+	}
+
+	admin := adminClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "completed" {
+		t.Errorf("status=%q want completed", got.GetTask().GetStatus())
+	}
+}
+
+// TestHTTP_FinalizeFailure covers /tasks/{id}/finalize with
+// outcome=failure and a message that must propagate to last_error.
+func TestHTTP_FinalizeFailure(t *testing.T) {
+	requireEndpointsReady(t)
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/302")
+
+	const reason = "blocked by review"
+	resp := httpRequest(t, http.MethodPost, "/tasks/"+id+"/finalize", url.Values{
+		"outcome": {"failure"},
+		"message": {reason},
+	}, true)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status=%d want 303 (body=%s)", resp.StatusCode, readBodyLimited(resp.Body, 512))
+	}
+
+	admin := adminClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "failed" {
+		t.Errorf("status=%q want failed", got.GetTask().GetStatus())
+	}
+	if !strings.Contains(got.GetTask().GetLastError(), reason) {
+		t.Errorf("last_error=%q want contains %q", got.GetTask().GetLastError(), reason)
+	}
+}
+
+// TestHTTP_FinalizeRejectsBadOutcome covers the input validation:
+// /tasks/{id}/finalize with no outcome (or a bogus one) returns 400.
+func TestHTTP_FinalizeRejectsBadOutcome(t *testing.T) {
+	requireEndpointsReady(t)
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/303")
+
+	resp := httpRequest(t, http.MethodPost, "/tasks/"+id+"/finalize", url.Values{
+		"outcome": {"banana"},
+	}, true)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d want 400", resp.StatusCode)
+	}
+
+	// Cleanup so the queue is clean.
+	admin := adminClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	}); err != nil {
+		t.Fatalf("cleanup FinalizeTask: %v", err)
+	}
+}
+
+// TestHTTP_RequeueClearsPRURL covers the master-side change in
+// RequeueTask: requeueing a completed task clears github_pr_url so the
+// task can be re-attempted from a clean slate.
+func TestHTTP_RequeueClearsPRURL(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/304")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	}); err != nil {
+		t.Fatalf("FinalizeTask: %v", err)
+	}
+
+	// Sanity: github_pr_url is set on the completed task.
+	pre, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pre.GetTask().GetGithubPrUrl() == "" {
+		t.Fatalf("expected github_pr_url to be set before requeue")
+	}
+
+	resp := httpRequest(t, http.MethodPost, "/tasks/"+id+"/requeue", url.Values{}, true)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("requeue status=%d want 303", resp.StatusCode)
+	}
+
+	post, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if post.GetTask().GetStatus() != "pending" {
+		t.Errorf("status=%q want pending", post.GetTask().GetStatus())
+	}
+	if post.GetTask().GetGithubPrUrl() != "" {
+		t.Errorf("github_pr_url=%q after requeue, want empty", post.GetTask().GetGithubPrUrl())
+	}
+
+	// Cleanup: cancel/delete the requeued task so subsequent tests don't
+	// see it. Delete is allowed from pending.
+	if _, err := admin.CancelTask(ctx, &pb.CancelTaskRequest{Id: id}); err != nil {
+		t.Logf("cleanup CancelTask: %v (non-fatal)", err)
 	}
 }
 

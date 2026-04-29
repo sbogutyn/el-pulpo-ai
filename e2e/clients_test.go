@@ -204,6 +204,27 @@ func probeMMCPWithToken(ctx context.Context, token string) error {
 	return nil
 }
 
+// instructionsPayload returns a JSON payload that satisfies the
+// `payload.instructions` requirement enforced by mastermind's store.
+// Optional `extras` are merged on top so callers can keep their own
+// fields ("step":"journey", "k":"v", …) without having to hand-roll the
+// JSON for every test.
+func instructionsPayload(extras map[string]any) []byte {
+	if extras == nil {
+		extras = map[string]any{}
+	}
+	if _, ok := extras["instructions"]; !ok {
+		extras["instructions"] = "e2e test instructions"
+	}
+	b, err := json.Marshal(extras)
+	if err != nil {
+		// All callers pass JSON-marshalable values; a panic here means a
+		// test passed something pathological.
+		panic(fmt.Sprintf("instructionsPayload: marshal: %v", err))
+	}
+	return b
+}
+
 // decodeStructured decodes the structured content of a tool result into
 // `out` (typically a pointer to a struct). Returns a helpful error when
 // the result is empty or was marked IsError.

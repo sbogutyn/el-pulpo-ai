@@ -24,9 +24,10 @@ func TestAdminGRPC_CreateHappy(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	payload := instructionsPayload(map[string]any{"k": "v"})
 	resp, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
 		Name:        "admin-happy-" + shortID(),
-		Payload:     []byte(`{"k":"v"}`),
+		Payload:     payload,
 		Priority:    1,
 		MaxAttempts: 2,
 		ScheduledFor: timestamppb.New(time.Now().Add(-1 * time.Second)),
@@ -48,8 +49,37 @@ func TestAdminGRPC_CreateHappy(t *testing.T) {
 		t.Errorf("priority = %d, want 1", got.GetPriority())
 	}
 	// Postgres JSONB normalizes whitespace; compare semantically.
-	if !jsonEqual(t, got.GetPayload(), `{"k":"v"}`) {
-		t.Errorf("payload = %q, want semantically %q", got.GetPayload(), `{"k":"v"}`)
+	if !jsonEqual(t, got.GetPayload(), string(payload)) {
+		t.Errorf("payload = %q, want semantically %q", got.GetPayload(), payload)
+	}
+}
+
+// TestAdminGRPC_CreateRequiresInstructions covers the new CreateTask
+// validator: payloads without a non-empty `instructions` string are
+// rejected with InvalidArgument.
+func TestAdminGRPC_CreateRequiresInstructions(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cases := []struct {
+		name    string
+		payload []byte
+	}{
+		{"missing", []byte(`{"k":"v"}`)},
+		{"empty string", []byte(`{"instructions":""}`)},
+		{"whitespace only", []byte(`{"instructions":"   "}`)},
+		{"wrong type", []byte(`{"instructions":42}`)},
+	}
+	for _, tc := range cases {
+		_, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+			Name: "instr-" + tc.name + "-" + shortID(), Payload: tc.payload,
+		})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("payload=%q: code=%s want InvalidArgument", tc.payload, status.Code(err))
+		}
 	}
 }
 
@@ -103,7 +133,7 @@ func TestAdminGRPC_GetTask(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "get-task-" + shortID()})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "get-task-" + shortID(), Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +170,7 @@ func TestAdminGRPC_ListAll(t *testing.T) {
 	// Create 3 tasks so the count is predictable-enough: total >= 3.
 	prefix := "list-all-" + shortID()
 	for i := 0; i < 3; i++ {
-		if _, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: prefix}); err != nil {
+		if _, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: prefix, Payload: instructionsPayload(nil)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -166,7 +196,7 @@ func TestAdminGRPC_ListFiltered(t *testing.T) {
 
 	// Filtered=pending should include our fresh task.
 	name := "list-filtered-" + shortID()
-	if _, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name}); err != nil {
+	if _, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: name, Payload: instructionsPayload(nil)}); err != nil {
 		t.Fatal(err)
 	}
 	resp, err := admin.ListTasks(ctx, &pb.ListTasksRequest{Status: "pending", Limit: 500})
@@ -206,7 +236,7 @@ func TestAdminGRPC_ListLogs(t *testing.T) {
 	defer cancel()
 
 	// Create, claim, append two logs, then list.
-	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "logs-" + shortID()})
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{Name: "logs-" + shortID(), Payload: instructionsPayload(nil)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,6 +297,153 @@ func TestAdminGRPC_ListLogs(t *testing.T) {
 	_, err = admin.ListTaskLogs(ctx, &pb.ListTaskLogsRequest{Id: "00000000-0000-0000-0000-000000000000"})
 	if status.Code(err) != codes.NotFound {
 		t.Errorf("unknown id: code=%s want NotFound", status.Code(err))
+	}
+}
+
+// parkTask drives a task into pr_opened so admin-only transitions can
+// be exercised. Returns (taskID, workerID); the worker is freed by
+// OpenPR so callers don't need to release the claim themselves.
+func parkTask(t *testing.T, prURL string) (string, string) {
+	t.Helper()
+	worker := workerClient(t)
+	admin := adminClient(t)
+	wid := "e2e-park-" + shortID()
+	id := claimWithName(t, worker, admin, wid, "park-"+shortID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if _, err := worker.Heartbeat(ctx, &pb.HeartbeatRequest{WorkerId: wid, TaskId: id}); err != nil {
+		t.Fatalf("park: Heartbeat: %v", err)
+	}
+	if _, err := worker.OpenPR(ctx, &pb.OpenPRRequest{
+		WorkerId: wid, TaskId: id, GithubPrUrl: prURL,
+	}); err != nil {
+		t.Fatalf("park: OpenPR: %v", err)
+	}
+	return id, wid
+}
+
+func TestAdminGRPC_RequestReview(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/100")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := admin.RequestReview(ctx, &pb.RequestReviewRequest{Id: id})
+	if err != nil {
+		t.Fatalf("RequestReview: %v", err)
+	}
+	if resp.GetTask().GetStatus() != "review_requested" {
+		t.Errorf("status=%q want review_requested", resp.GetTask().GetStatus())
+	}
+
+	// A second RequestReview from review_requested must be rejected
+	// (allowed only from pr_opened).
+	_, err = admin.RequestReview(ctx, &pb.RequestReviewRequest{Id: id})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("second RequestReview: code=%s want FailedPrecondition", status.Code(err))
+	}
+
+	// Cleanup: finalize the task as success so the queue is clean.
+	if _, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	}); err != nil {
+		t.Fatalf("cleanup FinalizeTask: %v", err)
+	}
+}
+
+// TestAdminGRPC_RequestReview_RejectsPending guards the transition
+// allow-list: only pr_opened may move to review_requested.
+func TestAdminGRPC_RequestReview_RejectsPending(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name: "review-bad-" + shortID(), Payload: instructionsPayload(nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = admin.RequestReview(ctx, &pb.RequestReviewRequest{Id: created.GetTask().GetId()})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("code=%s want FailedPrecondition", status.Code(err))
+	}
+}
+
+func TestAdminGRPC_FinalizeTask_Success(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/200")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	})
+	if err != nil {
+		t.Fatalf("FinalizeTask: %v", err)
+	}
+	if resp.GetTask().GetStatus() != "completed" {
+		t.Errorf("status=%q want completed", resp.GetTask().GetStatus())
+	}
+}
+
+func TestAdminGRPC_FinalizeTask_Failure(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/201")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	const reason = "rejected at review"
+	resp, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Failure_{Failure: &pb.FinalizeTaskRequest_Failure{Message: reason}},
+	})
+	if err != nil {
+		t.Fatalf("FinalizeTask: %v", err)
+	}
+	if resp.GetTask().GetStatus() != "failed" {
+		t.Errorf("status=%q want failed", resp.GetTask().GetStatus())
+	}
+	if !strings.Contains(resp.GetTask().GetLastError(), reason) {
+		t.Errorf("last_error=%q want contains %q", resp.GetTask().GetLastError(), reason)
+	}
+}
+
+// TestAdminGRPC_FinalizeTask_RejectsPending: finalize is admin-only and
+// only allowed from pr_opened or review_requested.
+func TestAdminGRPC_FinalizeTask_RejectsPending(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
+		Name: "finalize-bad-" + shortID(), Payload: instructionsPayload(nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      created.GetTask().GetId(),
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("code=%s want FailedPrecondition", status.Code(err))
 	}
 }
 

@@ -24,7 +24,7 @@ func TestReaper_Requeue(t *testing.T) {
 	defer cancel()
 
 	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
-		Name: "reaper-requeue-" + shortID(), MaxAttempts: 3,
+		Name: "reaper-requeue-" + shortID(), MaxAttempts: 3, Payload: instructionsPayload(nil),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestReaper_Terminal(t *testing.T) {
 	// attempt_count to 1, which equals max_attempts, so the reaper will
 	// transition us straight to `failed`.
 	created, err := admin.CreateTask(ctx, &pb.CreateTaskRequest{
-		Name: "reaper-terminal-" + shortID(), MaxAttempts: 1,
+		Name: "reaper-terminal-" + shortID(), MaxAttempts: 1, Payload: instructionsPayload(nil),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +92,55 @@ func TestReaper_Terminal(t *testing.T) {
 	})
 	if err != nil {
 		failWithLogs(t, "reaper did not terminate task: %v", err)
+	}
+}
+
+// TestReaper_SkipsParkedTasks verifies the regression captured in
+// 8b98665: tasks in pr_opened (or review_requested) must NOT be reaped
+// even though their last_heartbeat_at is older than VISIBILITY_TIMEOUT.
+// The claim is already released by OpenPR, so there is nothing for the
+// reaper to do. This test parks a task, waits well past VISIBILITY_TIMEOUT
+// + several reaper ticks, then asserts the status is unchanged.
+func TestReaper_SkipsParkedTasks(t *testing.T) {
+	requireEndpointsReady(t)
+	admin := adminClient(t)
+
+	id, _ := parkTask(t, "https://github.com/org/repo/pull/500")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Wait well past VISIBILITY_TIMEOUT (5s in compose) plus several
+	// reaper ticks (1s each) so any incorrect requeue would have fired.
+	time.Sleep(8 * time.Second)
+
+	got, err := admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "pr_opened" {
+		t.Errorf("status=%q want pr_opened (reaper should not touch parked tasks)", got.GetTask().GetStatus())
+	}
+
+	// Same guarantee from review_requested.
+	if _, err := admin.RequestReview(ctx, &pb.RequestReviewRequest{Id: id}); err != nil {
+		t.Fatalf("RequestReview: %v", err)
+	}
+	time.Sleep(8 * time.Second)
+	got, err = admin.GetTask(ctx, &pb.GetTaskRequest{Id: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.GetTask().GetStatus() != "review_requested" {
+		t.Errorf("status=%q want review_requested (reaper should not touch parked tasks)", got.GetTask().GetStatus())
+	}
+
+	// Cleanup.
+	if _, err := admin.FinalizeTask(ctx, &pb.FinalizeTaskRequest{
+		Id:      id,
+		Outcome: &pb.FinalizeTaskRequest_Success_{Success: &pb.FinalizeTaskRequest_Success{}},
+	}); err != nil {
+		t.Fatalf("cleanup FinalizeTask: %v", err)
 	}
 }
 

@@ -49,6 +49,10 @@ type Stack struct {
 	// TestMain.
 	MastermindMCPBin string
 
+	// Path to the elpulpo CLI binary built for the host. Compiled once in
+	// TestMain so cli_test.go can drive it like a real operator would.
+	ElpulpoBin string
+
 	// keep controls whether [Stack.Down] is a no-op. Set from E2E_KEEP=1.
 	keep bool
 }
@@ -172,6 +176,17 @@ func WaitForTCP(ctx context.Context, addr string) error {
 // `mcp.CommandTransport` can spawn it. Writing to the provided out path;
 // returns the absolute path written.
 func BuildMastermindMCPBinary(ctx context.Context, repoRoot, out string) (string, error) {
+	return buildHostBinary(ctx, repoRoot, "./cmd/mastermind-mcp", out)
+}
+
+// BuildElpulpoBinary builds the elpulpo admin CLI for the host. The CLI
+// is a thin wrapper over AdminService gRPC, so the e2e suite invokes it
+// like a real operator and verifies the binary contract end-to-end.
+func BuildElpulpoBinary(ctx context.Context, repoRoot, out string) (string, error) {
+	return buildHostBinary(ctx, repoRoot, "./cmd/elpulpo", out)
+}
+
+func buildHostBinary(ctx context.Context, repoRoot, pkg, out string) (string, error) {
 	abs, err := filepath.Abs(out)
 	if err != nil {
 		return "", err
@@ -179,12 +194,12 @@ func BuildMastermindMCPBinary(ctx context.Context, repoRoot, out string) (string
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return "", err
 	}
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", abs, "./cmd/mastermind-mcp")
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", abs, pkg)
 	cmd.Dir = repoRoot
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	out_, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("build mastermind-mcp: %w\n%s", err, out_)
+		return "", fmt.Errorf("build %s: %w\n%s", pkg, err, out_)
 	}
 	return abs, nil
 }
